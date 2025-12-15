@@ -28,11 +28,32 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker, Session
 
 from dotenv import load_dotenv
 import os
+from pathlib import Path
 
 # .env 로드 (DATABASE_URL 등이 있으면 사용)
 load_dotenv()
 
+# 기본 SQLite URL
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///poker.db")
+
+# Vercel 환경 여부 감지 (Vercel 은 VERCEL=1 환경변수 설정)
+IS_VERCEL = os.getenv("VERCEL") == "1"
+
+if DATABASE_URL.startswith("sqlite:///"):
+    raw_path = DATABASE_URL.replace("sqlite:///", "")  # 예: "poker.db" 또는 "some/path.db"
+
+    if IS_VERCEL:
+        # Vercel 서버리스의 경우 /tmp 만 쓰기 가능 → /tmp 하위로 강제 설정
+        if not raw_path.startswith("/"):
+            fixed_path = f"/tmp/{raw_path}"
+        else:
+            fixed_path = raw_path
+        DATABASE_URL = f"sqlite:///{fixed_path}"
+    else:
+        # 로컬/일반 서버: 프로젝트 루트 기준 경로로 변환
+        base_dir = Path(__file__).resolve().parent.parent
+        db_path = base_dir / raw_path
+        DATABASE_URL = f"sqlite:///{db_path}"
 
 # SQLite 엔진 생성
 engine = create_engine(

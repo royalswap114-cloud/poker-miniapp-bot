@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from dotenv import load_dotenv
 import os
+from pathlib import Path
 
 from bot.database import init_db, get_db, User, Banner
 from .routers import rooms as rooms_router
@@ -26,11 +27,16 @@ load_dotenv()
 
 WEBAPP_URL = os.getenv("WEBAPP_URL", "http://localhost:8000")
 
+# 현재 파일(webapp/app.py) 기준으로 프로젝트 루트 경로 계산
+BASE_DIR = Path(__file__).resolve().parent.parent
+TEMPLATES_DIR = BASE_DIR / "webapp" / "templates"
+STATIC_DIR = BASE_DIR / "webapp" / "static"
+
 app = FastAPI(title="Poker MiniApp")
 
-# 정적 파일, 템플릿 설정
-app.mount("/static", StaticFiles(directory="webapp/static"), name="static")
-templates = Jinja2Templates(directory="webapp/templates")
+# 정적 파일, 템플릿 설정 (절대 경로 사용 - Vercel 등 서버리스 환경에서도 안전)
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
 # CORS 설정

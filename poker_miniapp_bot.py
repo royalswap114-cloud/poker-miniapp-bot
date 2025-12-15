@@ -305,10 +305,12 @@ def main() -> None:
         admin_menu,
         admin_callback_handler,
         build_admin_create_room_conversation,
+        build_banner_create_conversation,
     )
 
     application.add_handler(CommandHandler("admin", admin_menu))
     application.add_handler(build_admin_create_room_conversation())
+    application.add_handler(build_banner_create_conversation())
     application.add_handler(CallbackQueryHandler(admin_callback_handler, pattern="^admin_"))
 
     # 버튼(callback_query) 핸들러 등록 (일반 유저용)

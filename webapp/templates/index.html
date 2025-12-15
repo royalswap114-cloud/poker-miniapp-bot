@@ -15,21 +15,19 @@
 <div id="app">
     <!-- 상단 배너 / 캐러셀 -->
     <header class="banner-carousel">
-        <div class="swiper">
+        <div class="swiper banner-swiper">
             <div class="swiper-wrapper" id="banner-container">
                 <!-- JS 가 배너 슬라이드 채움 -->
             </div>
+            <!-- 좌우 네비게이션 버튼 -->
+            <div class="swiper-button-prev"></div>
+            <div class="swiper-button-next"></div>
+            <!-- 위치 인디케이터 점 -->
             <div class="swiper-pagination"></div>
         </div>
     </header>
 
-    <!-- 환영 메시지 카드 -->
-    <section class="welcome-card">
-        <h1>환영합니다! TTPOKER</h1>
-        <p>즐거운 시간 되세요. 실시간 포커방에 참여해 보세요.</p>
-    </section>
-
-    <!-- 방 리스트 -->
+    <!-- 방 리스트 (포커방 카드 목록) -->
     <main class="room-list" id="room-list">
         <!-- JS 가 방 카드 렌더링 -->
         <div class="room-card skeleton">

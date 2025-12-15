@@ -29,57 +29,92 @@ body {
 
 /* 배너 캐러셀 */
 .banner-carousel {
-    padding: 12px 12px 0;
+    padding: 8px 0 4px; /* 좌우 여백 최소화, 전체 너비 느낌 */
 }
 
-.swiper {
+.banner-swiper {
     border-radius: 16px;
     overflow: hidden;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+    height: 320px; /* 요구사항: 높이 300~350px 사이 (모바일 전체 너비) */
 }
 
 .banner-slide {
     position: relative;
-    padding: 16px;
-    background: linear-gradient(135deg, #1e3a8a, #581c87);
-    color: #fff;
+    width: 100%;
+    height: 100%;
+}
+
+.banner-image-link {
+    display: block;
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.banner-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: 16px;
+    /* GIF, PNG, JPG 모두 지원 (GIF는 자동으로 애니메이션 재생) */
+}
+
+.banner-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent 60%);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
 }
 
 .banner-title {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
 }
 
 .banner-desc {
-    font-size: 13px;
+    font-size: 12px;
     opacity: 0.9;
 }
 
-.banner-link {
-    margin-top: 10px;
-    font-size: 12px;
+.banner-link-text {
+    margin-top: 6px;
+    font-size: 11px;
     color: var(--accent);
 }
 
-/* 환영 카드 */
-
-.welcome-card {
-    margin: 12px;
-    padding: 14px 16px;
-    background: rgba(20, 26, 47, 0.9);
-    border-radius: 16px;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+/* Swiper 네비게이션 & 인디케이터 */
+.banner-swiper .swiper-button-prev,
+.banner-swiper .swiper-button-next {
+    color: #ffffff;
+    width: 40px;   /* 모바일에서도 잘 보이도록 크게 */
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.4);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
-.welcome-card h1 {
-    font-size: 18px;
-    margin-bottom: 6px;
+.banner-swiper .swiper-button-prev:after,
+.banner-swiper .swiper-button-next:after {
+    font-size: 20px;
 }
 
-.welcome-card p {
-    font-size: 13px;
-    color: var(--text-secondary);
+.banner-swiper .swiper-pagination-bullets {
+    bottom: 6px;
+}
+
+.banner-swiper .swiper-pagination-bullet {
+    background: rgba(255, 255, 255, 0.6);
+    opacity: 1;
+}
+
+.banner-swiper .swiper-pagination-bullet-active {
+    background: var(--accent);
 }
 
 /* 방 리스트 */

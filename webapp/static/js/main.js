@@ -31,23 +31,39 @@ async function loadBanners() {
         container.innerHTML = "";
 
         if (!banners.length) {
-            // 기본 배너
+            // 기본 배너 (이미지 슬라이드가 없을 때)
             const slide = document.createElement("div");
             slide.className = "swiper-slide banner-slide";
             slide.innerHTML = `
-                <div class="banner-title">JACKPOT 100만원</div>
-                <div class="banner-desc">royalswap_kr 채널을 확인하세요.</div>
-                <div class="banner-link">@royalswap_kr</div>
+                <a class="banner-image-link" href="https://t.me/royalswap_kr" target="_blank" rel="noopener noreferrer">
+                    <img src="https://via.placeholder.com/800x200?text=JACKPOT+100%EB%A7%8C%EC%9B%90" alt="JACKPOT 100만원" class="banner-image" loading="lazy" />
+                    <div class="banner-overlay">
+                        <div class="banner-title">JACKPOT 100만원</div>
+                        <div class="banner-desc">royalswap_kr 채널을 확인하세요.</div>
+                        <div class="banner-link-text">@royalswap_kr</div>
+                    </div>
+                </a>
             `;
             container.appendChild(slide);
         } else {
             for (const b of banners) {
                 const slide = document.createElement("div");
                 slide.className = "swiper-slide banner-slide";
+
+                const imageUrl = b.image_url || "https://via.placeholder.com/800x200?text=TTPOKER";
+                const linkUrl = b.link_url || "#";
+
+                // 배너 전체를 클릭 가능한 링크로 처리
+                // GIF, PNG, JPG 모두 지원 (GIF는 자동으로 애니메이션 재생됨)
                 slide.innerHTML = `
-                    <div class="banner-title">${b.title || ""}</div>
-                    <div class="banner-desc">${b.description || ""}</div>
-                    ${b.link_url ? `<div class="banner-link">${b.link_url}</div>` : ""}
+                    <a class="banner-image-link" href="${linkUrl}" target="_blank" rel="noopener noreferrer">
+                        <img src="${imageUrl}" alt="${b.title || ""}" class="banner-image" loading="lazy" />
+                        <div class="banner-overlay">
+                            ${b.title ? `<div class="banner-title">${b.title}</div>` : ""}
+                            ${b.description ? `<div class="banner-desc">${b.description}</div>` : ""}
+                            ${b.link_url ? `<div class="banner-link-text">${b.link_url}</div>` : ""}
+                        </div>
+                    </a>
                 `;
                 container.appendChild(slide);
             }
@@ -56,14 +72,19 @@ async function loadBanners() {
         if (swiperInstance) {
             swiperInstance.update();
         } else {
-            swiperInstance = new Swiper(".swiper", {
+            swiperInstance = new Swiper(".banner-swiper", {
                 loop: true,
                 autoplay: {
-                    delay: 4000,
+                    delay: 4000, // 4초마다 자동 슬라이드
+                    disableOnInteraction: false,
                 },
                 pagination: {
                     el: ".swiper-pagination",
                     clickable: true,
+                },
+                navigation: {
+                    nextEl: ".swiper-button-next",
+                    prevEl: ".swiper-button-prev",
                 },
             });
         }

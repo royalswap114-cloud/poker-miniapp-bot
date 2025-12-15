@@ -74,10 +74,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
-def is_admin(user_id: int) -> bool:
-    """해당 user_id 가 ADMIN_IDS 에 포함되어 있는지 확인."""
-    return user_id in ADMIN_IDS
+# is_admin 함수는 이제 bot.utils 에서 import 합니다.
+from bot.utils import is_admin
 
 
 # ==============================
@@ -202,7 +200,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """InlineKeyboard 버튼 클릭 처리 (callback_query)."""
+    """
+    InlineKeyboard 버튼 클릭 처리 (callback_query) - 일반 유저용.
+    관리자 콜백은 bot/handlers/admin.py 의 admin_callback_handler 가 처리합니다.
+    """
     query = update.callback_query
     await query.answer()  # 로딩 아이콘 제거
 
@@ -223,33 +224,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             f"현재까지 기록된 플레이 횟수: {user_stats[user.id]['play_count']} 회"
         )
         await query.message.reply_text(msg)
-        return
-
-    # 관리자 메뉴용 콜백
-    if data and data.startswith("admin_"):
-        # 관리자 권한 확인
-        if not is_admin(user.id):
-            await query.message.reply_text("이 기능은 관리자만 사용할 수 있습니다.")
-            return
-
-        if data == "admin_create_room":
-            await query.message.reply_text("📝 방 생성 기능은 아직 구현 준비 중입니다. (TODO)")
-        elif data == "admin_update_room":
-            await query.message.reply_text("✏️ 방 수정 기능은 아직 구현 준비 중입니다. (TODO)")
-        elif data == "admin_delete_room":
-            await query.message.reply_text("🗑️ 방 삭제 기능은 아직 구현 준비 중입니다. (TODO)")
-        elif data == "admin_stats":
-            # 간단한 통계 예시 (인메모리 통계 기준)
-            total_users = len(user_stats)
-            total_plays = sum(int(info.get("play_count", 0)) for info in user_stats.values())
-            text = (
-                "📊 간단 통계\n\n"
-                f"- 통계에 기록된 사용자 수: {total_users} 명\n"
-                f"- 총 기록된 플레이 횟수: {total_plays} 회\n"
-            )
-            await query.message.reply_text(text)
-        elif data == "admin_broadcast":
-            await query.message.reply_text("📢 공지사항 발송 기능은 아직 구현 준비 중입니다. (TODO)")
         return
 
 
@@ -278,50 +252,7 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.message.reply_text(text)
 
 
-async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    /admin - 관리자 메뉴.
-    - ADMIN_IDS 에 포함된 사용자만 사용 가능.
-    """
-    user = update.effective_user
-    user_id = user.id if user else None
-
-    logger.info("명령어 실행: /admin, 사용자: %s", user_id)
-    print(f"[CMD] /admin from {user_id}")
-
-    if not user:
-        await update.message.reply_text("사용자 정보를 가져올 수 없습니다.")
-        return
-
-    if not ADMIN_IDS:
-        await update.message.reply_text(
-            "ADMIN_IDS 가 설정되지 않았습니다. .env 의 ADMIN_IDS 를 확인하세요."
-        )
-        return
-
-    if not is_admin(user.id):
-        await update.message.reply_text("이 명령어는 관리자만 사용할 수 있습니다.")
-        return
-
-    # 관리자 인라인 메뉴 키보드
-    keyboard = InlineKeyboardMarkup(
-        [
-            [
-                InlineKeyboardButton("📝 방 생성", callback_data="admin_create_room"),
-                InlineKeyboardButton("✏️ 방 수정", callback_data="admin_update_room"),
-            ],
-            [
-                InlineKeyboardButton("🗑️ 방 삭제", callback_data="admin_delete_room"),
-            ],
-            [
-                InlineKeyboardButton("📊 통계 보기", callback_data="admin_stats"),
-                InlineKeyboardButton("📢 공지사항 발송", callback_data="admin_broadcast"),
-            ],
-        ]
-    )
-
-    text = "📌 관리자 메뉴입니다. 원하는 작업을 선택하세요."
-    await update.message.reply_text(text, reply_markup=keyboard)
+# admin_command 함수는 이제 bot/handlers/admin.py 의 admin_menu 로 이동했습니다.
 
 
 # ==============================
@@ -367,10 +298,20 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("stats", stats_command))
-    application.add_handler(CommandHandler("admin", admin_command))
     application.add_handler(CommandHandler("debug_token", debug_token_command))
 
-    # 버튼(callback_query) 핸들러 등록
+    # 관리자 핸들러 등록 (bot/handlers/admin.py)
+    from bot.handlers.admin import (
+        admin_menu,
+        admin_callback_handler,
+        build_admin_create_room_conversation,
+    )
+
+    application.add_handler(CommandHandler("admin", admin_menu))
+    application.add_handler(build_admin_create_room_conversation())
+    application.add_handler(CallbackQueryHandler(admin_callback_handler, pattern="^admin_"))
+
+    # 버튼(callback_query) 핸들러 등록 (일반 유저용)
     application.add_handler(CallbackQueryHandler(button_callback))
 
     # 에러 핸들러 등록

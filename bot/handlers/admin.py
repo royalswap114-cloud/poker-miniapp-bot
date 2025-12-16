@@ -28,14 +28,14 @@ from ..utils import is_admin, ADMIN_IDS
 
 logger = logging.getLogger(__name__)
 
-# Conversation 상태 정의 (방 생성 플로우)
+# Conversation 상태 정의 (방 생성 플로우 - 6단계)
 (
     ROOM_NAME,
     ROOM_URL,
-    BLINDS,
-    MIN_BUYIN,
-    GAME_TIME,
-    DESCRIPTION,
+    ROOM_BLINDS,
+    ROOM_BUYIN,
+    ROOM_TIME,
+    ROOM_CONTACT,
 ) = range(6)
 
 # 배너 생성 플로우 상태 (ROOM_* 이후부터 번호 사용)
@@ -151,10 +151,10 @@ async def admin_create_room_start(update: Update, context: ContextTypes.DEFAULT_
     context.user_data["room_data"] = {}
 
     text = (
-        "📝 새 포커방 생성\n\n"
-        "Step 1/6: 방 이름을 입력해 주세요.\n"
-        "예: RN.1 TTPOKER 또는 프리미엄 1번방\n\n"
-        "취소하려면 /cancel 를 입력하세요."
+        "🏠 <b>새 방 만들기 (1/6)</b>\n\n"
+        "📝 방 이름을 입력하세요:\n"
+        "(예: 에르메스홀덤 1번방)\n\n"
+        "취소: /cancel"
     )
 
     if query:
@@ -175,11 +175,12 @@ async def admin_create_room_name(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data["room_data"]["room_name"] = room_name
 
     text = (
-        "Step 2/6: pokernow.club 방 URL을 입력해 주세요.\n"
-        "예: https://www.pokernow.club/games/xxxxxxxx\n\n"
-        "취소하려면 /cancel 를 입력하세요."
+        f"✅ 방 이름: {room_name}\n\n"
+        "🏠 <b>새 방 만들기 (2/6)</b>\n\n"
+        "🔗 방 URL을 입력하세요:\n"
+        "(예: https://www.pokernow.club/games/xxxxx)"
     )
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, parse_mode="HTML")
 
     return ROOM_URL
 
@@ -189,20 +190,22 @@ async def admin_create_room_url(update: Update, context: ContextTypes.DEFAULT_TY
     room_url = update.message.text.strip()
     if not room_url.startswith("http"):
         await update.message.reply_text(
-            "올바른 URL 형식이 아닙니다. http:// 또는 https:// 로 시작하는 URL을 입력해 주세요."
+            "❌ 올바른 URL을 입력하세요.\n"
+            "(http:// 또는 https://로 시작해야 합니다)"
         )
         return ROOM_URL
 
     context.user_data["room_data"]["room_url"] = room_url
 
     text = (
-        "Step 3/6: 블라인드를 입력해 주세요.\n"
-        "예: 100/200 또는 1만/2만\n\n"
-        "취소하려면 /cancel 를 입력하세요."
+        f"✅ 방 URL: {room_url}\n\n"
+        "🏠 <b>새 방 만들기 (3/6)</b>\n\n"
+        "💰 블라인드를 입력하세요:\n"
+        "(예: 1만/2만)"
     )
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, parse_mode="HTML")
 
-    return BLINDS
+    return ROOM_BLINDS
 
 
 async def admin_create_room_blinds(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -210,63 +213,74 @@ async def admin_create_room_blinds(update: Update, context: ContextTypes.DEFAULT
     blinds = update.message.text.strip()
     if not blinds:
         await update.message.reply_text("블라인드를 입력해 주세요.")
-        return BLINDS
+        return ROOM_BLINDS
 
     context.user_data["room_data"]["blinds"] = blinds
 
     text = (
-        "Step 4/6: 최소 바이인을 입력해 주세요.\n"
-        "예: 10,000 또는 1만\n\n"
-        "취소하려면 /cancel 를 입력하세요."
+        f"✅ 블라인드: {blinds}\n\n"
+        "🏠 <b>새 방 만들기 (4/6)</b>\n\n"
+        "💵 최소 바이인을 입력하세요:\n"
+        "(예: 100만~500만)"
     )
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, parse_mode="HTML")
 
-    return MIN_BUYIN
+    return ROOM_BUYIN
 
 
-async def admin_create_room_min_buyin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def admin_create_room_buyin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Step 4: 최소 바이인 입력."""
     min_buyin = update.message.text.strip()
     if not min_buyin:
         await update.message.reply_text("최소 바이인을 입력해 주세요.")
-        return MIN_BUYIN
+        return ROOM_BUYIN
 
     context.user_data["room_data"]["min_buyin"] = min_buyin
 
     text = (
-        "Step 5/6: 게임 시간을 입력해 주세요.\n"
-        "예: 매일 21:00 또는 2분 매너타임\n\n"
-        "취소하려면 /cancel 를 입력하세요."
+        f"✅ 최소 바이인: {min_buyin}\n\n"
+        "🏠 <b>새 방 만들기 (5/6)</b>\n\n"
+        "⏰ 게임 시간을 입력하세요:\n"
+        "(예: 24시간 매너타임 1시간)"
     )
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, parse_mode="HTML")
 
-    return GAME_TIME
+    return ROOM_TIME
 
 
-async def admin_create_room_game_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def admin_create_room_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Step 5: 게임 시간 입력."""
     game_time = update.message.text.strip()
     if not game_time:
         await update.message.reply_text("게임 시간을 입력해 주세요.")
-        return GAME_TIME
+        return ROOM_TIME
 
     context.user_data["room_data"]["game_time"] = game_time
 
     text = (
-        "Step 6/6: 방 설명을 입력해 주세요. (선택사항)\n"
-        "설명이 없으면 '없음' 또는 'skip' 을 입력하세요.\n\n"
-        "취소하려면 /cancel 를 입력하세요."
+        f"✅ 게임 시간: {game_time}\n\n"
+        "🏠 <b>새 방 만들기 (6/6)</b>\n\n"
+        "📱 바인/아웃 담당자 텔레그램 ID를 입력하세요:\n"
+        "(예: ROYAL_USDT_TRX)\n\n"
+        "⚠️ @ 기호는 빼고 입력하세요\n"
+        "스킵하려면 'skip' 입력"
     )
-    await update.message.reply_text(text)
+    await update.message.reply_text(text, parse_mode="HTML")
 
-    return DESCRIPTION
+    return ROOM_CONTACT
 
 
-async def admin_create_room_description(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Step 6: 설명 입력 및 DB 저장."""
-    description = update.message.text.strip()
-    if description.lower() in ["없음", "skip", "스킵", "-"]:
-        description = None
+
+
+async def admin_create_room_contact(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Step 6: 연락처 입력 및 DB 저장."""
+    contact_input = update.message.text.strip()
+    
+    # @ 기호 제거 및 스킵 처리
+    if contact_input.lower() in ["skip", "스킵", "없음", "-"]:
+        contact_telegram = None
+    else:
+        contact_telegram = contact_input.replace('@', '').strip()
 
     room_data: Dict[str, str] = context.user_data.get("room_data", {})
 
@@ -291,43 +305,47 @@ async def admin_create_room_description(update: Update, context: ContextTypes.DE
             blinds=room_data["blinds"],
             min_buyin=room_data["min_buyin"],
             game_time=room_data["game_time"],
-            description=description,
-            status="active",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            contact_telegram=contact_telegram,
+            current_players=0,
+            max_players=10,
+            status="active"
         )
         db.add(room)
         db.commit()
         db.refresh(room)
 
         # 성공 메시지
+        contact_text = f"📱 담당자: @{room.contact_telegram}" if room.contact_telegram else "📱 담당자: 미설정"
+        
         success_text = (
-            "✅ 새 포커방이 생성되었습니다!\n\n"
-            f"📝 방 이름: {room.room_name}\n"
+            "✅ <b>방 생성 완료!</b>\n\n"
+            f"📝 이름: {room.room_name}\n"
             f"🔗 URL: {room.room_url}\n"
-            f"🪙 블라인드: {room.blinds}\n"
-            f"💰 최소 바이인: {room.min_buyin}\n"
-            f"⏱️ 게임 시간: {room.game_time}\n"
-            f"📄 설명: {room.description or '없음'}\n"
-            f"🆔 방 ID: {room.id}\n\n"
-            "관리자 메뉴로 돌아가려면 /admin 을 입력하세요."
+            f"💰 블라인드: {room.blinds}\n"
+            f"💵 최소 바이인: {room.min_buyin}\n"
+            f"⏰ 게임 시간: {room.game_time}\n"
+            f"{contact_text}\n"
+            f"👥 최대 인원: 10명"
         )
 
-        await update.message.reply_text(success_text)
+        await update.message.reply_text(success_text, parse_mode="HTML")
 
         logger.info(
-            "방 생성 완료: room_id=%s, room_name=%s, user_id=%s",
+            "방 생성 완료: room_id=%s, room_name=%s, contact=%s, user_id=%s",
             room.id,
             room.room_name,
+            contact_telegram,
             update.effective_user.id,
         )
-        print(f"[ADMIN] Room created: id={room.id}, name={room.room_name}")
+        print(f"[ADMIN] Room created: id={room.id}, name={room.room_name}, contact={contact_telegram}")
 
     except Exception as e:
         logger.error("방 생성 중 오류 발생: %s", e, exc_info=True)
         print(f"[ERROR] Failed to create room: {e}")
         await update.message.reply_text(
-            "❌ 방 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
+            f"❌ <b>방 생성 실패</b>\n\n"
+            f"오류: {str(e)}",
+            parse_mode="HTML"
         )
     finally:
         db.close()
@@ -787,17 +805,17 @@ def build_admin_create_room_conversation() -> ConversationHandler:
             ROOM_URL: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_room_url)
             ],
-            BLINDS: [
+            ROOM_BLINDS: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_room_blinds)
             ],
-            MIN_BUYIN: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_room_min_buyin)
+            ROOM_BUYIN: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_room_buyin)
             ],
-            GAME_TIME: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_room_game_time)
+            ROOM_TIME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_room_time)
             ],
-            DESCRIPTION: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_room_description)
+            ROOM_CONTACT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_create_room_contact)
             ],
         },
         fallbacks=[
@@ -1081,16 +1099,20 @@ async def admin_edit_room_select(update: Update, context: ContextTypes.DEFAULT_T
         keyboard = [
             [InlineKeyboardButton("📝 방 이름", callback_data="edit_field_name")],
             [InlineKeyboardButton("🔗 방 URL", callback_data="edit_field_url")],
+            [InlineKeyboardButton("📱 담당자 ID", callback_data="edit_field_contact")],
             [InlineKeyboardButton("👥 최대 인원", callback_data="edit_field_max_players")],
             [InlineKeyboardButton("👤 현재 인원", callback_data="edit_field_current_players")],
             [InlineKeyboardButton("🔄 상태", callback_data="edit_field_status")],
             [InlineKeyboardButton("« 취소", callback_data="admin_update_room")]
         ]
         
+        contact_text = f"@{room.contact_telegram}" if room.contact_telegram else "미설정"
+        
         await query.edit_message_text(
             f"✏️ *방 수정: {room.room_name}*\n\n"
             f"📝 이름: {room.room_name}\n"
             f"🔗 URL: {room.room_url}\n"
+            f"📱 담당자: {contact_text}\n"
             f"👥 최대 인원: {room.max_players}\n"
             f"👤 현재 인원: {room.current_players}\n"
             f"🔄 상태: {room.status}\n\n"
@@ -1119,6 +1141,7 @@ async def admin_edit_room_field(update: Update, context: ContextTypes.DEFAULT_TY
     field_names = {
         'name': '방 이름',
         'url': '방 URL',
+        'contact': '담당자 텔레그램 ID',
         'max_players': '최대 인원',
         'current_players': '현재 인원',
         'status': '상태'
@@ -1221,6 +1244,12 @@ async def admin_edit_room_value(update: Update, context: ContextTypes.DEFAULT_TY
                 await update.message.reply_text("올바른 URL을 입력하세요 (http:// 또는 https://)")
                 return EDIT_ROOM_VALUE
             room.room_url = new_value
+        elif field == 'contact':
+            # @ 기호 제거 및 스킵 처리
+            if new_value.lower() in ["skip", "스킵", "없음", "-"]:
+                room.contact_telegram = None
+            else:
+                room.contact_telegram = new_value.replace('@', '').strip()
         elif field == 'max_players':
             try:
                 max_players = int(new_value)
@@ -1247,6 +1276,7 @@ async def admin_edit_room_value(update: Update, context: ContextTypes.DEFAULT_TY
         field_names = {
             'name': '방 이름',
             'url': '방 URL',
+            'contact': '담당자 텔레그램 ID',
             'max_players': '최대 인원',
             'current_players': '현재 인원'
         }

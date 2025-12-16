@@ -132,10 +132,26 @@ function renderRooms(rooms) {
                 <span class="room-status">${room.status.toUpperCase()}</span>
             </div>
             <div class="room-meta">
-                <div>🪙 블라인드: ${room.blinds || "-"}</div>
-                <div>👥 ${room.current_players || 0} / ${room.max_players || 9} Playing</div>
-                <div>💰 최소 바이인: ${room.min_buyin || "-"}</div>
-                <div>⏱️ ${room.game_time || "-"}</div>
+                <div class="info-row">
+                    <span class="info-icon">💰</span>
+                    <span class="info-label">블라인드:</span>
+                    <span class="info-value">${room.blinds || '-'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-icon">💵</span>
+                    <span class="info-label">최소 바이인:</span>
+                    <span class="info-value">${room.min_buyin || '-'}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-icon">👥</span>
+                    <span class="info-label">인원:</span>
+                    <span class="info-value">${room.current_players || 0} / ${room.max_players || 10} Playing</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-icon">⏰</span>
+                    <span class="info-label">게임 시간:</span>
+                    <span class="info-value">${room.game_time || '-'}</span>
+                </div>
             </div>
             <div class="room-actions">
                 <button class="btn primary">🎮 게임 참여하기</button>
@@ -145,7 +161,7 @@ function renderRooms(rooms) {
 
         const [joinBtn, buyinBtn] = card.querySelectorAll("button");
         joinBtn.addEventListener("click", () => joinGame(room));
-        buyinBtn.addEventListener("click", () => showBuyinInfo(room));
+        buyinBtn.addEventListener("click", () => handleBuyIn(room));
 
         list.appendChild(card);
     }
@@ -186,14 +202,28 @@ async function joinGame(room) {
     }
 }
 
-function showBuyinInfo(room) {
-    const msg = `바인/아웃 안내\n\n방: ${room.room_name}\n최소 바이인: ${
-        room.min_buyin || "-"
-    }\n\n바인/아웃 관련 문의는 운영자에게 문의해 주세요.`;
+function handleBuyIn(room) {
+    // 바인/아웃 담당자 텔레그램으로 연결
+    if (!room.contact_telegram) {
+        const msg = `바인/아웃 담당자 정보가 없습니다.\n\n방: ${room.room_name}\n\n운영자에게 문의해 주세요.`;
+        if (tg) {
+            tg.showAlert(msg);
+        } else {
+            alert(msg);
+        }
+        return;
+    }
+    
+    const telegramUrl = 'https://t.me/' + room.contact_telegram;
+    
+    console.log('[BUY_IN] 텔레그램 연결:', room.contact_telegram, telegramUrl);
+    
     if (tg) {
-        tg.showAlert(msg);
+        // Telegram WebApp에서 열기
+        tg.openTelegramLink(telegramUrl);
     } else {
-        alert(msg);
+        // 일반 브라우저에서 새 탭으로 열기
+        window.open(telegramUrl, '_blank');
     }
 }
 

@@ -38,10 +38,10 @@ def list_rooms(db: Session = Depends(get_db)) -> List[dict]:
             "blinds": r.blinds,
             "min_buyin": r.min_buyin,
             "game_time": r.game_time,
-            "description": r.description,
             "status": r.status,
             "current_players": r.current_players,
             "max_players": r.max_players,
+            "contact_telegram": r.contact_telegram,
         }
         for r in rooms
     ]
@@ -60,10 +60,10 @@ def get_room(room_id: int, db: Session = Depends(get_db)) -> dict:
         "blinds": room.blinds,
         "min_buyin": room.min_buyin,
         "game_time": room.game_time,
-        "description": room.description,
         "status": room.status,
         "current_players": room.current_players,
         "max_players": room.max_players,
+        "contact_telegram": room.contact_telegram,
     }
 
 

@@ -65,17 +65,16 @@ class Room(Base):
     __tablename__ = "rooms"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    room_name = Column(String(100), nullable=False)
-    room_url = Column(Text, nullable=False)
-    blinds = Column(String(50))
-    min_buyin = Column(String(50))
-    game_time = Column(String(50))
-    description = Column(Text)
-    status = Column(String(20), default="active")
+    room_name = Column(String(200), nullable=False)
+    room_url = Column(String(500), nullable=False)
+    blinds = Column(String(100))  # 블라인드 (예: 1만/2만)
+    min_buyin = Column(String(100))  # 최소 바이인 (예: 100만~500만)
+    game_time = Column(String(200))  # 게임 시간 (예: 24시간 매너타임 1시간)
     current_players = Column(Integer, default=0)
     max_players = Column(Integer, default=10)
+    status = Column(String(20), default="active")
+    contact_telegram = Column(String(100))  # 바인/아웃 담당자 텔레그램 ID
     created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
 
     joins = relationship("RoomJoin", back_populates="room")
 

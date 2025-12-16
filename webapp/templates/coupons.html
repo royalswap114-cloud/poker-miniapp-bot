@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>쿠폰함 - TTPOKER</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0f1014;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding-bottom: 80px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            display: flex;
+            align-items: center;
+        }
+        .back-btn {
+            font-size: 24px;
+            margin-right: 15px;
+            cursor: pointer;
+            text-decoration: none;
+            color: white;
+        }
+        .header-title {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .tabs {
+            display: flex;
+            background: #16172d;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            color: #8b92b0;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+        .coupons-container {
+            padding: 20px;
+        }
+        .coupon-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 15px;
+            position: relative;
+            overflow: hidden;
+        }
+        .coupon-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100px;
+            height: 100%;
+            background: rgba(255,255,255,0.1);
+            transform: skewX(-15deg);
+        }
+        .coupon-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .coupon-desc {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 12px;
+        }
+        .coupon-amount {
+            font-size: 28px;
+            font-weight: 900;
+            color: #FFE66D;
+        }
+        .coupon-code {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-top: 8px;
+        }
+        .coupon-expire {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #8b92b0;
+        }
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #16172d;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            padding: 10px 0;
+            z-index: 100;
+        }
+        .nav-item {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            color: #8b92b0;
+            text-decoration: none;
+            font-size: 12px;
+        }
+        .nav-item.active {
+            color: #667eea;
+        }
+        .nav-icon {
+            font-size: 24px;
+            display: block;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/profile" class="back-btn">‹</a>
+        <div class="header-title">쿠폰함</div>
+    </div>
+    
+    <div class="tabs">
+        <div class="tab active" onclick="filterCoupons('all')">전체</div>
+        <div class="tab" onclick="filterCoupons('unused')">미사용</div>
+        <div class="tab" onclick="filterCoupons('used')">사용</div>
+    </div>
+    
+    <div class="coupons-container" id="couponsContainer">
+        <div class="empty-state">
+            <div class="empty-icon">🎟️</div>
+            <p>로딩 중...</p>
+        </div>
+    </div>
+    
+    <div class="bottom-nav">
+        <a href="/" class="nav-item">
+            <span class="nav-icon">🏠</span>
+            <span>홈</span>
+        </a>
+        <a href="/profile" class="nav-item active">
+            <span class="nav-icon">👤</span>
+            <span>프로필</span>
+        </a>
+    </div>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        let tg;
+        let allCoupons = [];
+        let currentFilter = 'all';
+        
+        try {
+            tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+        } catch (e) {
+            console.error('Telegram WebApp 초기화 실패:', e);
+        }
+        
+        async function loadCoupons() {
+            const container = document.getElementById('couponsContainer');
+            
+            if (!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">❌</div>
+                        <p>사용자 정보를 가져올 수 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const userId = tg.initDataUnsafe.user.id;
+            
+            try {
+                const response = await fetch('/api/coupons/' + userId);
+                allCoupons = await response.json();
+                
+                displayCoupons();
+            } catch (error) {
+                console.error('쿠폰 로딩 실패:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">⚠️</div>
+                        <p>쿠폰 정보를 불러올 수 없습니다.</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function displayCoupons() {
+            const container = document.getElementById('couponsContainer');
+            
+            let coupons = allCoupons;
+            if (currentFilter === 'unused') {
+                coupons = allCoupons.filter(c => !c.is_used);
+            } else if (currentFilter === 'used') {
+                coupons = allCoupons.filter(c => c.is_used);
+            }
+            
+            if (coupons.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">🎟️</div>
+                        <p>쿠폰이 없습니다</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = coupons.map(coupon => {
+                const expireText = coupon.expires_at 
+                    ? new Date(coupon.expires_at).toLocaleDateString('ko-KR')
+                    : '무제한';
+                
+                return `
+                    <div class="coupon-card">
+                        <div class="coupon-title">${coupon.title}</div>
+                        <div class="coupon-desc">${coupon.description || ''}</div>
+                        <div class="coupon-amount">${coupon.amount.toLocaleString()}원</div>
+                        <div class="coupon-code">쿠폰코드: ${coupon.code}</div>
+                        <div class="coupon-expire">유효기간: ${expireText}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function filterCoupons(filter) {
+            currentFilter = filter;
+            
+            // 탭 활성화 업데이트
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            displayCoupons();
+        }
+        
+        // 페이지 로드 시 쿠폰 로딩
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadCoupons);
+        } else {
+            loadCoupons();
+        }
+    </script>
+</body>
+</html>
+

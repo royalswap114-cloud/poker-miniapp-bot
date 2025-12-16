@@ -69,6 +69,13 @@ USE_COUPON_CODE = 250
     EVENT_IMAGE,
 ) = range(210, 213)
 
+# 방 수정 플로우 상태
+(
+    EDIT_ROOM_SELECT,
+    EDIT_ROOM_FIELD,
+    EDIT_ROOM_VALUE,
+) = range(300, 303)
+
 
 async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
@@ -704,7 +711,7 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     # ===== 방 관리 =====
     if data == "admin_update_room":
-        await admin_edit_room_list(update, context)
+        # ConversationHandler가 처리 (build_edit_room_conversation)
         return
 
     if data == "admin_delete_room":
@@ -1018,26 +1025,277 @@ async def admin_edit_room_list(update: Update, context: ContextTypes.DEFAULT_TYP
         rooms = db.query(Room).all()
         
         if not rooms:
-            await query.edit_message_text("등록된 방이 없습니다.")
+            from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+            await query.edit_message_text(
+                "등록된 방이 없습니다.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("« 뒤로", callback_data="admin_menu")]
+                ])
+            )
             return
         
         from telegram import InlineKeyboardMarkup, InlineKeyboardButton
         
         keyboard = []
         for room in rooms:
+            status_emoji = "🟢" if room.status == "active" else "🔴"
             keyboard.append([InlineKeyboardButton(
-                f"{room.room_name} [{room.status}]",
-                callback_data=f"edit_room_{room.id}"
+                f"{status_emoji} {room.room_name} ({room.current_players}/{room.max_players})",
+                callback_data=f"edit_room_select_{room.id}"
             )])
         
         keyboard.append([InlineKeyboardButton("« 뒤로", callback_data="admin_menu")])
         
         await query.edit_message_text(
-            "✏️ 수정할 방을 선택하세요:",
-            reply_markup=InlineKeyboardMarkup(keyboard)
+            "✏️ *방 수정*\n\n"
+            "수정할 방을 선택하세요:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
         )
     finally:
         db.close()
+
+
+async def admin_edit_room_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """수정할 방 선택 후 필드 선택"""
+    query = update.callback_query
+    if not query:
+        return ConversationHandler.END
+    
+    await query.answer()
+    
+    room_id = int(query.data.split("_")[-1])
+    context.user_data['edit_room_id'] = room_id
+    
+    db = SessionLocal()
+    
+    try:
+        room = db.query(Room).filter(Room.id == room_id).first()
+        
+        if not room:
+            await query.edit_message_text("방을 찾을 수 없습니다.")
+            return ConversationHandler.END
+        
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        keyboard = [
+            [InlineKeyboardButton("📝 방 이름", callback_data="edit_field_name")],
+            [InlineKeyboardButton("🔗 방 URL", callback_data="edit_field_url")],
+            [InlineKeyboardButton("👥 최대 인원", callback_data="edit_field_max_players")],
+            [InlineKeyboardButton("👤 현재 인원", callback_data="edit_field_current_players")],
+            [InlineKeyboardButton("🔄 상태", callback_data="edit_field_status")],
+            [InlineKeyboardButton("« 취소", callback_data="admin_update_room")]
+        ]
+        
+        await query.edit_message_text(
+            f"✏️ *방 수정: {room.room_name}*\n\n"
+            f"📝 이름: {room.room_name}\n"
+            f"🔗 URL: {room.room_url}\n"
+            f"👥 최대 인원: {room.max_players}\n"
+            f"👤 현재 인원: {room.current_players}\n"
+            f"🔄 상태: {room.status}\n\n"
+            "수정할 항목을 선택하세요:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+        
+        return EDIT_ROOM_FIELD
+        
+    finally:
+        db.close()
+
+
+async def admin_edit_room_field(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """수정할 필드 선택"""
+    query = update.callback_query
+    if not query:
+        return ConversationHandler.END
+    
+    await query.answer()
+    
+    field = query.data.split("_")[-1]
+    context.user_data['edit_field'] = field
+    
+    field_names = {
+        'name': '방 이름',
+        'url': '방 URL',
+        'max_players': '최대 인원',
+        'current_players': '현재 인원',
+        'status': '상태'
+    }
+    
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    if field == 'status':
+        # 상태는 직접 선택
+        keyboard = [
+            [InlineKeyboardButton("🟢 활성", callback_data="edit_status_active")],
+            [InlineKeyboardButton("🔴 비활성", callback_data="edit_status_inactive")],
+            [InlineKeyboardButton("« 취소", callback_data="admin_update_room")]
+        ]
+        
+        await query.edit_message_text(
+            "🔄 *상태 변경*\n\n"
+            "변경할 상태를 선택하세요:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+        return EDIT_ROOM_FIELD
+    else:
+        await query.edit_message_text(
+            f"✏️ *{field_names[field]} 수정*\n\n"
+            f"새로운 {field_names[field]}을(를) 입력하세요:\n\n"
+            "취소: /cancel",
+            parse_mode="Markdown"
+        )
+        return EDIT_ROOM_VALUE
+
+
+async def admin_edit_room_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """상태 변경 처리"""
+    query = update.callback_query
+    if not query:
+        return ConversationHandler.END
+    
+    await query.answer()
+    
+    new_status = query.data.split("_")[-1]
+    room_id = context.user_data.get('edit_room_id')
+    
+    if not room_id:
+        await query.edit_message_text("오류가 발생했습니다. 다시 시도해주세요.")
+        return ConversationHandler.END
+    
+    db = SessionLocal()
+    
+    try:
+        room = db.query(Room).filter(Room.id == room_id).first()
+        
+        if room:
+            room.status = new_status
+            db.commit()
+            
+            status_text = "활성" if new_status == "active" else "비활성"
+            
+            await query.edit_message_text(
+                f"✅ *상태 변경 완료!*\n\n"
+                f"방 이름: {room.room_name}\n"
+                f"상태: {status_text}",
+                parse_mode="Markdown"
+            )
+            
+            logger.info(f"[ADMIN] 방 상태 변경: {room_id} → {new_status}")
+        else:
+            await query.edit_message_text("방을 찾을 수 없습니다.")
+        
+    finally:
+        db.close()
+    
+    return ConversationHandler.END
+
+
+async def admin_edit_room_value(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """새 값 입력 및 업데이트"""
+    room_id = context.user_data.get('edit_room_id')
+    field = context.user_data.get('edit_field')
+    new_value = update.message.text.strip()
+    
+    if not room_id or not field:
+        await update.message.reply_text("오류가 발생했습니다. 다시 시도해주세요.")
+        return ConversationHandler.END
+    
+    db = SessionLocal()
+    
+    try:
+        room = db.query(Room).filter(Room.id == room_id).first()
+        
+        if not room:
+            await update.message.reply_text("방을 찾을 수 없습니다.")
+            return ConversationHandler.END
+        
+        # 필드별 검증 및 업데이트
+        if field == 'name':
+            room.room_name = new_value
+        elif field == 'url':
+            if not new_value.startswith('http'):
+                await update.message.reply_text("올바른 URL을 입력하세요 (http:// 또는 https://)")
+                return EDIT_ROOM_VALUE
+            room.room_url = new_value
+        elif field == 'max_players':
+            try:
+                max_players = int(new_value)
+                if max_players < 1 or max_players > 100:
+                    await update.message.reply_text("1~100 사이의 숫자를 입력하세요.")
+                    return EDIT_ROOM_VALUE
+                room.max_players = max_players
+            except ValueError:
+                await update.message.reply_text("숫자를 입력하세요.")
+                return EDIT_ROOM_VALUE
+        elif field == 'current_players':
+            try:
+                current_players = int(new_value)
+                if current_players < 0 or current_players > room.max_players:
+                    await update.message.reply_text(f"0~{room.max_players} 사이의 숫자를 입력하세요.")
+                    return EDIT_ROOM_VALUE
+                room.current_players = current_players
+            except ValueError:
+                await update.message.reply_text("숫자를 입력하세요.")
+                return EDIT_ROOM_VALUE
+        
+        db.commit()
+        
+        field_names = {
+            'name': '방 이름',
+            'url': '방 URL',
+            'max_players': '최대 인원',
+            'current_players': '현재 인원'
+        }
+        
+        await update.message.reply_text(
+            f"✅ *{field_names[field]} 수정 완료!*\n\n"
+            f"방 이름: {room.room_name}\n"
+            f"새로운 값: {new_value}",
+            parse_mode="Markdown"
+        )
+        
+        logger.info(f"[ADMIN] 방 수정: {room_id}, {field} → {new_value}")
+        
+    finally:
+        db.close()
+    
+    return ConversationHandler.END
+
+
+async def edit_room_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """방 수정 취소"""
+    context.user_data.pop('edit_room_id', None)
+    context.user_data.pop('edit_field', None)
+    await update.message.reply_text("방 수정이 취소되었습니다.")
+    return ConversationHandler.END
+
+
+def build_edit_room_conversation() -> ConversationHandler:
+    """방 수정용 ConversationHandler 인스턴스 생성."""
+    return ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(admin_edit_room_list, pattern="^admin_update_room$"),
+            CallbackQueryHandler(admin_edit_room_select, pattern="^edit_room_select_")
+        ],
+        states={
+            EDIT_ROOM_FIELD: [
+                CallbackQueryHandler(admin_edit_room_field, pattern="^edit_field_"),
+                CallbackQueryHandler(admin_edit_room_status, pattern="^edit_status_")
+            ],
+            EDIT_ROOM_VALUE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, admin_edit_room_value)
+            ]
+        },
+        fallbacks=[
+            CommandHandler("cancel", edit_room_cancel),
+            MessageHandler(filters.COMMAND, edit_room_cancel),
+            CallbackQueryHandler(admin_edit_room_list, pattern="^admin_update_room$")
+        ],
+    )
 
 
 async def admin_delete_room_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

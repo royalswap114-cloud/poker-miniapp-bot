@@ -356,6 +356,7 @@ def main() -> None:
         admin_menu,
         admin_callback_handler,
         build_admin_create_room_conversation,
+        build_edit_room_conversation,
         build_banner_create_conversation,
         build_update_players_conversation,
         build_coupon_conversation,
@@ -369,6 +370,7 @@ def main() -> None:
     
     # ConversationHandlers (순서 중요! 먼저 등록)
     application.add_handler(build_admin_create_room_conversation())
+    application.add_handler(build_edit_room_conversation())
     application.add_handler(build_banner_create_conversation())
     application.add_handler(build_update_players_conversation())
     application.add_handler(build_coupon_conversation())
@@ -396,7 +398,7 @@ def main() -> None:
     print("등록된 핸들러:")
     print("  - 기본 명령어: /start, /help, /stats, /debug_token")
     print("  - 관리자 명령어: /admin")
-    print("  - ConversationHandlers: 방 생성, 배너 생성, 인원 수 업데이트, 쿠폰 발급, 쿠폰 사용 처리, 이벤트 작성")
+    print("  - ConversationHandlers: 방 생성, 방 수정, 배너 생성, 인원 수 업데이트, 쿠폰 발급, 쿠폰 사용 처리, 이벤트 작성")
     print("  - 콜백 핸들러: admin_*, delete_room_*")
     print("=" * 50)
     

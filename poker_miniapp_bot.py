@@ -154,30 +154,29 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     # WebApp 버튼 (커스텀 미니앱 UI 열기 - WEBAPP_URL)
     webapp_button = InlineKeyboardButton(
-        text="🎰 TTPOKER 입장하기",
+        text="🃏 홀덤테이블",
         web_app=WebAppInfo(url=WEBAPP_URL),  # 텔레그램 내 WebView 로 커스텀 미니앱 열기
     )
 
-    # 통계용: 게임 시작 버튼 (callback query)
-    start_game_button = InlineKeyboardButton(
-        text="▶️ 게임 시작하기",
-        callback_data="start_game",
+    # 제휴업체목록 버튼 (callback query)
+    partners_button = InlineKeyboardButton(
+        text="🤝 제휴업체목록",
+        callback_data="partners_list",
     )
 
     keyboard = InlineKeyboardMarkup(
         [
             [webapp_button],
-            [start_game_button],
+            [partners_button],
         ]
     )
 
     welcome_text = (
-        "안녕하세요! PokerNow 미니앱 연동 봇입니다.\n\n"
-        "아래 버튼을 사용해 보세요:\n"
-        "🃏 <b>PokerNow 미니앱 열기</b> - 텔레그램 안에서 pokernow.club 을 WebApp 으로 엽니다.\n"
-        "▶️ <b>게임 시작하기</b> - 게임 시작 알림 + 플레이 횟수 기록.\n\n"
-        "또는 /stats 로 본인 통계를 확인할 수 있습니다.\n"
-        "도움말: /help"
+        "텔레그램 NO.1 홀덤 로얄커뮤니티 입니다.\n\n"
+        "검증된 업체에서 언제든지 실시간으로 테이블을 확인하여,\n"
+        "언제든지 게임에 참여해보세요\n\n"
+        "🃏 <b>홀덤테이블</b> - 실시간 홀덤방 테이블 목록을 확인하고 게임에 참여하세요.\n"
+        "🤝 <b>제휴업체목록</b> - 제휴 업체 정보를 확인하세요."
     )
 
     await update.message.reply_html(welcome_text, reply_markup=keyboard)
@@ -212,16 +211,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     logger.info("Callback 실행: data=%s, user_id=%s", data, user.id if user else None)
     print(f"[CB] data={data} from {user.id if user else None}")
 
-    # 일반 유저용 게임 시작 버튼
-    if data == "start_game":
-        # 통계 증가
-        increase_play_count(user.id, user.username)
-
-        # 사용자에게 알림 메시지
+    # 제휴업체목록 버튼
+    if data == "partners_list":
+        # 임시로 "준비중" 메시지 표시 (나중에 채널 연동 예정)
         msg = (
-            "✅ 게임을 시작했습니다!\n"
-            "PokerNow 방을 생성하거나 입장한 후 플레이를 즐겨주세요.\n\n"
-            f"현재까지 기록된 플레이 횟수: {user_stats[user.id]['play_count']} 회"
+            "🤝 제휴업체목록\n\n"
+            "현재 준비 중입니다.\n"
+            "곧 제휴 업체 정보를 확인할 수 있습니다.\n\n"
+            "문의: @royalswap_kr"
         )
         await query.message.reply_text(msg)
         return
@@ -306,12 +303,26 @@ def main() -> None:
         admin_callback_handler,
         build_admin_create_room_conversation,
         build_banner_create_conversation,
+        build_update_players_conversation,
+        build_coupon_conversation,
+        build_event_conversation,
+        admin_delete_room_confirm,
     )
 
     application.add_handler(CommandHandler("admin", admin_menu))
+    
+    # ConversationHandlers (순서 중요! 먼저 등록)
     application.add_handler(build_admin_create_room_conversation())
     application.add_handler(build_banner_create_conversation())
+    application.add_handler(build_update_players_conversation())
+    application.add_handler(build_coupon_conversation())
+    application.add_handler(build_event_conversation())
+    
+    # 관리자 콜백 핸들러 (admin_ 패턴)
     application.add_handler(CallbackQueryHandler(admin_callback_handler, pattern="^admin_"))
+    
+    # 방 삭제 콜백 핸들러 (delete_room_ 패턴)
+    application.add_handler(CallbackQueryHandler(admin_delete_room_confirm, pattern="^delete_room_"))
 
     # 버튼(callback_query) 핸들러 등록 (일반 유저용)
     application.add_handler(CallbackQueryHandler(button_callback))
@@ -319,7 +330,16 @@ def main() -> None:
     # 에러 핸들러 등록
     application.add_error_handler(error_handler)
 
-    print("🤖 봇이 시작되었습니다... Ctrl+C 로 종료할 수 있습니다.")
+    print("=" * 50)
+    print("🤖 봇이 시작되었습니다!")
+    print("=" * 50)
+    print("등록된 핸들러:")
+    print("  - 기본 명령어: /start, /help, /stats, /debug_token")
+    print("  - 관리자 명령어: /admin")
+    print("  - ConversationHandlers: 방 생성, 배너 생성, 인원 수 업데이트, 쿠폰 발급, 이벤트 작성")
+    print("  - 콜백 핸들러: admin_*, delete_room_*")
+    print("=" * 50)
+    
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 

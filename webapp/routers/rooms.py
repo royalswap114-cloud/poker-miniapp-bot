@@ -20,13 +20,16 @@ router = APIRouter(prefix="/api/rooms", tags=["rooms"])
 
 @router.get("", response_model=list[dict])
 def list_rooms(db: Session = Depends(get_db)) -> List[dict]:
-    """활성 방 목록 반환."""
+    """
+    활성 방 목록 반환.
+    """
     rooms = (
         db.query(Room)
         .filter(Room.status == "active")
         .order_by(Room.id.asc())
         .all()
     )
+    
     return [
         {
             "id": r.id,
@@ -99,6 +102,7 @@ def join_room(
     db.commit()
 
     return {"ok": True, "message": "join recorded"}
+
 
 
 

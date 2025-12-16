@@ -18,10 +18,13 @@ from sqlalchemy.orm import Session
 
 from dotenv import load_dotenv
 import os
+import logging
 from pathlib import Path
 
 from bot.database import init_db, get_db, User, Banner
-from .routers import rooms as rooms_router
+from .routers import rooms as rooms_router, profile as profile_router
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -116,8 +119,9 @@ async def api_get_user(user_id: int, db: Session = Depends(get_db)) -> dict:
     }
 
 
-# rooms 관련 API 라우터 등록
+# 라우터 등록
 app.include_router(rooms_router.router)
+app.include_router(profile_router.router)
 
 
 

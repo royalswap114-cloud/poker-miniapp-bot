@@ -30,34 +30,51 @@ async function loadBanners() {
         const container = document.getElementById("banner-container");
         container.innerHTML = "";
 
+        console.log("[배너] API 응답:", banners);
+        console.log("[배너] 배너 개수:", banners.length);
+
         if (!banners.length) {
-            // 기본 배너 (이미지 슬라이드가 없을 때)
+            // DB에 배너가 없을 때 기본 메시지 표시
             const slide = document.createElement("div");
             slide.className = "swiper-slide banner-slide";
             slide.innerHTML = `
-                <a class="banner-image-link" href="https://t.me/royalswap_kr" target="_blank" rel="noopener noreferrer">
-                    <img src="https://via.placeholder.com/800x200?text=JACKPOT+100%EB%A7%8C%EC%9B%90" alt="JACKPOT 100만원" class="banner-image" loading="lazy" />
-                    <div class="banner-overlay">
-                        <div class="banner-title">JACKPOT 100만원</div>
-                        <div class="banner-desc">royalswap_kr 채널을 확인하세요.</div>
-                        <div class="banner-link-text">@royalswap_kr</div>
-                    </div>
-                </a>
+                <div class="banner-placeholder">
+                    <h2>배너를 추가해주세요</h2>
+                    <p>관리자에게 문의: @royalswap_kr</p>
+                    <p style="font-size: 11px; opacity: 0.7; margin-top: 8px;">/admin → 🎨 배너 관리</p>
+                </div>
             `;
             container.appendChild(slide);
+            console.log("[배너] 배너가 없어 기본 메시지 표시");
         } else {
             for (const b of banners) {
                 const slide = document.createElement("div");
                 slide.className = "swiper-slide banner-slide";
 
-                const imageUrl = b.image_url || "https://via.placeholder.com/800x200?text=TTPOKER";
+                const imageUrl = b.image_url || "";
                 const linkUrl = b.link_url || "#";
+                const bannerTitle = b.title || "배너";
+                const bannerDesc = b.description || "";
+
+                console.log(`[배너] 로딩 시도: ID=${b.id}, URL=${imageUrl}`);
 
                 // 배너 전체를 클릭 가능한 링크로 처리
                 // GIF, PNG, JPG 모두 지원 (GIF는 자동으로 애니메이션 재생됨)
+                // 이미지 로딩 에러 시 플레이스홀더 표시
                 slide.innerHTML = `
                     <a class="banner-image-link" href="${linkUrl}" target="_blank" rel="noopener noreferrer">
-                        <img src="${imageUrl}" alt="${b.title || ""}" class="banner-image" loading="lazy" />
+                        <img 
+                            src="${imageUrl}" 
+                            alt="${bannerTitle}" 
+                            class="banner-image" 
+                            loading="lazy"
+                            onerror="console.error('[배너] 이미지 로딩 실패:', '${imageUrl}'); this.style.display='none'; const placeholder = this.parentElement.querySelector('.banner-placeholder'); if (placeholder) placeholder.style.display='flex';"
+                        />
+                        <div class="banner-placeholder" style="display:none;">
+                            <h2>${bannerTitle}</h2>
+                            ${bannerDesc ? `<p>${bannerDesc}</p>` : ""}
+                            <p style="font-size: 11px; opacity: 0.7; margin-top: 8px;">@royalswap_kr</p>
+                        </div>
                         <div class="banner-overlay">
                             ${b.title ? `<div class="banner-title">${b.title}</div>` : ""}
                             ${b.description ? `<div class="banner-desc">${b.description}</div>` : ""}
@@ -201,28 +218,20 @@ async function loadProfile() {
 }
 
 function setupNav() {
-    const navHome = document.getElementById("nav-home");
-    const navProfile = document.getElementById("nav-profile");
-    const profileModal = document.getElementById("profile-modal");
-    const closeProfile = document.getElementById("close-profile");
-
-    navHome.addEventListener("click", () => {
-        navHome.classList.add("active");
-        navProfile.classList.remove("active");
-        profileModal.classList.add("hidden");
-    });
-
-    navProfile.addEventListener("click", async () => {
-        navHome.classList.remove("active");
-        navProfile.classList.add("active");
-        await loadProfile();
-        profileModal.classList.remove("hidden");
-    });
-
-    closeProfile.addEventListener("click", () => {
-        profileModal.classList.add("hidden");
-        navProfile.classList.remove("active");
-        navHome.classList.add("active");
+    // 하단 네비게이션이 링크로 변경되어 JavaScript 이벤트 핸들러가 필요 없음
+    // 프로필 모달은 더 이상 사용하지 않음 (별도 페이지로 이동)
+    
+    // 현재 페이지에 따라 active 클래스 설정
+    const currentPath = window.location.pathname;
+    const navItems = document.querySelectorAll('.nav-item');
+    
+    navItems.forEach(item => {
+        const href = item.getAttribute('href');
+        if (href === currentPath) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
+        }
     });
 }
 

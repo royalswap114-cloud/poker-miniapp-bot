@@ -23,7 +23,7 @@ from telegram.ext import (
     filters,
 )
 
-from ..database import SessionLocal, Room, Banner
+from ..database import SessionLocal, Room, Banner, Coupon, Event, User
 from ..utils import is_admin, ADMIN_IDS
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,25 @@ logger = logging.getLogger(__name__)
     BANNER_LINK,
     BANNER_ORDER,
 ) = range(6, 11)
+
+# 인원 수 업데이트 플로우 상태
+ROOM_PLAYERS_INPUT = 11
+
+# 쿠폰 관리 플로우 상태
+(
+    COUPON_USER_ID,
+    COUPON_TITLE,
+    COUPON_DESC,
+    COUPON_AMOUNT,
+    COUPON_EXPIRES,
+) = range(200, 205)
+
+# 이벤트 관리 플로우 상태
+(
+    EVENT_TITLE,
+    EVENT_CONTENT,
+    EVENT_IMAGE,
+) = range(210, 213)
 
 
 async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -80,11 +99,17 @@ async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             ],
             [
                 InlineKeyboardButton("🗑️ 방 삭제", callback_data="admin_delete_room"),
-                InlineKeyboardButton("🎨 배너 관리", callback_data="admin_banner"),
+            ],
+            [
+                InlineKeyboardButton("🔄 인원 수 업데이트", callback_data="admin_update_players"),
+            ],
+            [
+                InlineKeyboardButton("🎟️ 쿠폰 관리", callback_data="admin_coupons"),
+                InlineKeyboardButton("🎉 이벤트 관리", callback_data="admin_events"),
             ],
             [
                 InlineKeyboardButton("📊 통계 보기", callback_data="admin_stats"),
-                InlineKeyboardButton("📢 공지사항 발송", callback_data="admin_broadcast"),
+                InlineKeyboardButton("🎨 배너 관리", callback_data="admin_banner"),
             ],
         ]
     )
@@ -516,6 +541,36 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     data = query.data or ""
 
+    if data == "admin_menu":
+        # 관리자 메뉴로 돌아가기
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("📝 방 생성", callback_data="admin_create_room"),
+                    InlineKeyboardButton("✏️ 방 수정", callback_data="admin_update_room"),
+                ],
+                [
+                    InlineKeyboardButton("🗑️ 방 삭제", callback_data="admin_delete_room"),
+                    InlineKeyboardButton("🎨 배너 관리", callback_data="admin_banner"),
+                ],
+                [
+                    InlineKeyboardButton("🔄 인원 수 업데이트", callback_data="admin_update_players"),
+                ],
+                [
+                    InlineKeyboardButton("📊 통계 보기", callback_data="admin_stats"),
+                    InlineKeyboardButton("📢 공지사항 발송", callback_data="admin_broadcast"),
+                ],
+            ]
+        )
+        
+        await query.edit_message_text(
+            "📌 관리자 메뉴입니다. 원하는 작업을 선택하세요.",
+            reply_markup=keyboard
+        )
+        return
+
     if data == "admin_create_room":
         # ConversationHandler가 처리하므로 여기서는 아무것도 안 함
         return
@@ -644,13 +699,33 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
             db.close()
         return
 
-    # ===== 기존 방/통계/공지 처리 =====
+    # ===== 방 관리 =====
     if data == "admin_update_room":
-        await query.message.reply_text("✏️ 방 수정 기능은 아직 구현 준비 중입니다. (TODO)")
+        await admin_edit_room_list(update, context)
         return
 
     if data == "admin_delete_room":
-        await query.message.reply_text("🗑️ 방 삭제 기능은 아직 구현 준비 중입니다. (TODO)")
+        await admin_delete_room_list(update, context)
+        return
+
+    # delete_room_ 패턴은 별도 핸들러에서 처리 (poker_miniapp_bot.py)
+
+    # ===== 쿠폰 관리 =====
+    if data == "admin_coupons":
+        await admin_coupons(update, context)
+        return
+
+    if data == "admin_create_coupon":
+        # ConversationHandler가 처리
+        return
+
+    # ===== 이벤트 관리 =====
+    if data == "admin_events":
+        await admin_events(update, context)
+        return
+
+    if data == "admin_create_event":
+        # ConversationHandler가 처리
         return
 
     if data == "admin_stats":
@@ -668,8 +743,14 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
             db.close()
         return
 
-    if data == "admin_broadcast":
-        await query.message.reply_text("📢 공지사항 발송 기능은 아직 구현 준비 중입니다. (TODO)")
+
+    # ===== 인원 수 업데이트 =====
+    if data == "admin_update_players":
+        await admin_update_players(update, context)
+        return
+
+    if data.startswith("update_room_players_"):
+        # ConversationHandler가 처리하므로 여기서는 아무것도 안 함
         return
 
 
@@ -734,6 +815,667 @@ def build_banner_create_conversation() -> ConversationHandler:
         fallbacks=[
             CommandHandler("cancel", banner_add_cancel),
             MessageHandler(filters.COMMAND, banner_add_cancel),
+        ],
+    )
+
+
+# ==============================
+# 인원 수 업데이트 ConversationHandler
+# ==============================
+
+
+async def admin_update_players(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """관리자: 방 인원 수 업데이트 메뉴 표시"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    await query.answer()
+    
+    user = query.from_user
+    if not is_admin(user.id):
+        await query.message.reply_text("이 기능은 관리자만 사용할 수 없습니다.")
+        return
+    
+    db = SessionLocal()
+    
+    try:
+        rooms = db.query(Room).filter(Room.status == "active").all()
+        
+        if not rooms:
+            await query.edit_message_text("활성화된 방이 없습니다.")
+            return
+        
+        # 각 방의 현재 인원 수 표시
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        keyboard = []
+        for room in rooms:
+            button_text = f"{room.room_name} ({room.current_players}/{room.max_players})"
+            keyboard.append([InlineKeyboardButton(
+                button_text, 
+                callback_data=f"update_room_players_{room.id}"
+            )])
+        
+        keyboard.append([InlineKeyboardButton("« 뒤로", callback_data="admin_menu")])
+        
+        await query.edit_message_text(
+            "📊 현재 인원 수를 업데이트할 방을 선택하세요:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        logger.error(f"Error in admin_update_players: {e}", exc_info=True)
+        await query.message.reply_text("❌ 오류가 발생했습니다.")
+    finally:
+        db.close()
+
+
+async def update_room_players_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """특정 방의 인원 수 입력 시작"""
+    query = update.callback_query
+    if not query:
+        return ConversationHandler.END
+    
+    await query.answer()
+    
+    try:
+        room_id = int(query.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await query.message.reply_text("잘못된 방 ID입니다.")
+        return ConversationHandler.END
+    
+    context.user_data['updating_room_id'] = room_id
+    
+    db = SessionLocal()
+    
+    try:
+        room = db.query(Room).filter(Room.id == room_id).first()
+        if not room:
+            await query.edit_message_text("방을 찾을 수 없습니다.")
+            return ConversationHandler.END
+        
+        await query.edit_message_text(
+            f"🎮 {room.room_name}\n\n"
+            f"현재 인원: {room.current_players}/{room.max_players}\n\n"
+            f"새로운 인원 수를 입력하세요 (0-{room.max_players}):\n"
+            f"취소하려면 /cancel"
+        )
+        
+        return ROOM_PLAYERS_INPUT
+    except Exception as e:
+        logger.error(f"Error in update_room_players_start: {e}", exc_info=True)
+        await query.message.reply_text("❌ 오류가 발생했습니다.")
+        return ConversationHandler.END
+    finally:
+        db.close()
+
+
+async def update_room_players_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """방 인원 수 입력 처리"""
+    try:
+        players = int(update.message.text.strip())
+    except ValueError:
+        await update.message.reply_text("숫자를 입력해주세요.")
+        return ROOM_PLAYERS_INPUT
+    
+    room_id = context.user_data.get('updating_room_id')
+    if not room_id:
+        await update.message.reply_text("오류가 발생했습니다. 다시 시도해주세요.")
+        return ConversationHandler.END
+    
+    db = SessionLocal()
+    
+    try:
+        room = db.query(Room).filter(Room.id == room_id).first()
+        if not room:
+            await update.message.reply_text("방을 찾을 수 없습니다.")
+            return ConversationHandler.END
+        
+        if players < 0 or players > room.max_players:
+            await update.message.reply_text(
+                f"0부터 {room.max_players} 사이의 숫자를 입력하세요."
+            )
+            return ROOM_PLAYERS_INPUT
+        
+        old_players = room.current_players
+        room.current_players = players
+        db.commit()
+        
+        await update.message.reply_text(
+            f"✅ 업데이트 완료!\n\n"
+            f"🎮 {room.room_name}\n"
+            f"인원: {old_players} → {players}"
+        )
+        
+        logger.info(f"Room {room.id} players updated: {old_players} → {players}")
+        print(f"[ADMIN] Room {room.id} players updated: {old_players} → {players}")
+        
+    except Exception as e:
+        logger.error(f"Error in update_room_players_input: {e}", exc_info=True)
+        await update.message.reply_text("❌ 업데이트 중 오류가 발생했습니다.")
+        db.rollback()
+    finally:
+        db.close()
+    
+    # 사용자 데이터 정리
+    context.user_data.pop('updating_room_id', None)
+    
+    return ConversationHandler.END
+
+
+async def update_players_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """인원 수 업데이트 취소"""
+    context.user_data.pop('updating_room_id', None)
+    await update.message.reply_text("인원 수 업데이트가 취소되었습니다.")
+    return ConversationHandler.END
+
+
+def build_update_players_conversation() -> ConversationHandler:
+    """인원 수 업데이트용 ConversationHandler 인스턴스 생성."""
+    return ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(update_room_players_start, pattern="^update_room_players_")
+        ],
+        states={
+            ROOM_PLAYERS_INPUT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, update_room_players_input)
+            ],
+        },
+        fallbacks=[
+            CommandHandler("cancel", update_players_cancel),
+            MessageHandler(filters.COMMAND, update_players_cancel),
+        ],
+    )
+
+
+# ==============================
+# 방 수정/삭제 기능
+# ==============================
+
+
+async def admin_edit_room_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """방 수정: 방 목록 표시"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    await query.answer()
+    
+    db = SessionLocal()
+    
+    try:
+        rooms = db.query(Room).all()
+        
+        if not rooms:
+            await query.edit_message_text("등록된 방이 없습니다.")
+            return
+        
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        keyboard = []
+        for room in rooms:
+            keyboard.append([InlineKeyboardButton(
+                f"{room.room_name} [{room.status}]",
+                callback_data=f"edit_room_{room.id}"
+            )])
+        
+        keyboard.append([InlineKeyboardButton("« 뒤로", callback_data="admin_menu")])
+        
+        await query.edit_message_text(
+            "✏️ 수정할 방을 선택하세요:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    finally:
+        db.close()
+
+
+async def admin_delete_room_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """방 삭제: 방 목록 표시"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    await query.answer()
+    
+    db = SessionLocal()
+    
+    try:
+        rooms = db.query(Room).all()
+        
+        if not rooms:
+            await query.edit_message_text("등록된 방이 없습니다.")
+            return
+        
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        keyboard = []
+        for room in rooms:
+            keyboard.append([InlineKeyboardButton(
+                f"🗑 {room.room_name}",
+                callback_data=f"delete_room_{room.id}"
+            )])
+        
+        keyboard.append([InlineKeyboardButton("« 취소", callback_data="admin_menu")])
+        
+        await query.edit_message_text(
+            "⚠️ 삭제할 방을 선택하세요:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    finally:
+        db.close()
+
+
+async def admin_delete_room_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """방 삭제 실행"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    await query.answer()
+    
+    logger.info(f"[DELETE_ROOM] Called for data: {query.data}")
+    print(f"[ADMIN] DELETE_ROOM callback: {query.data}")
+    
+    try:
+        room_id = int(query.data.split("_")[-1])
+        logger.info(f"[DELETE_ROOM] Parsed room_id: {room_id}")
+    except (ValueError, IndexError) as e:
+        logger.error(f"[DELETE_ROOM] Failed to parse room_id: {e}")
+        await query.message.reply_text("잘못된 방 ID입니다.")
+        return
+    
+    db = SessionLocal()
+    
+    try:
+        room = db.query(Room).filter(Room.id == room_id).first()
+        if not room:
+            await query.edit_message_text("방을 찾을 수 없습니다.")
+            return
+        
+        room_name = room.room_name
+        db.delete(room)
+        db.commit()
+        
+        logger.info(f"Deleted room: {room_id} ({room_name})")
+        print(f"[ADMIN] Room deleted: id={room_id}, name={room_name}")
+        
+        # 업데이트된 방 목록으로 메뉴 다시 표시
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        rooms = db.query(Room).all()
+        keyboard = [
+            [InlineKeyboardButton("➕ 새 방 만들기", callback_data="admin_create_room")],
+            [InlineKeyboardButton("✏️ 방 수정", callback_data="admin_update_room")],
+            [InlineKeyboardButton("🗑 방 삭제", callback_data="admin_delete_room")],
+            [InlineKeyboardButton("« 뒤로", callback_data="admin_menu")]
+        ]
+        
+        await query.edit_message_text(
+            f"✅ '{room_name}' 방이 삭제되었습니다.\n\n"
+            f"🏠 *방 관리*\n\n"
+            f"현재 등록된 방: {len(rooms)}개",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error deleting room: {e}", exc_info=True)
+        await query.message.reply_text("❌ 방 삭제 중 오류가 발생했습니다.")
+        db.rollback()
+    finally:
+        db.close()
+
+
+# ==============================
+# 쿠폰 관리 기능
+# ==============================
+
+
+async def admin_coupons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """쿠폰 관리 메뉴"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    await query.answer()
+    
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    keyboard = [
+        [InlineKeyboardButton("➕ 쿠폰 발급", callback_data="admin_create_coupon")],
+        [InlineKeyboardButton("📋 쿠폰 목록", callback_data="admin_list_coupons")],
+        [InlineKeyboardButton("« 뒤로", callback_data="admin_menu")]
+    ]
+    
+    await query.edit_message_text(
+        "🎟️ *쿠폰 관리*\n\n"
+        "원하는 작업을 선택하세요:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+
+async def admin_create_coupon_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """쿠폰 발급 시작"""
+    query = update.callback_query
+    if not query:
+        return ConversationHandler.END
+    
+    await query.answer()
+    
+    logger.info("[COUPON] Starting coupon creation")
+    print("[ADMIN] Starting coupon creation")
+    
+    await query.edit_message_text(
+        "🎟️ *쿠폰 발급*\n\n"
+        "쿠폰을 받을 사용자의 텔레그램 ID를 입력하세요:\n"
+        "(여러 명에게 발급하려면 쉼표로 구분: 123456,789012)\n\n"
+        "취소: /cancel",
+        parse_mode="Markdown"
+    )
+    
+    return COUPON_USER_ID
+
+
+async def coupon_user_id_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """사용자 ID 입력"""
+    try:
+        user_ids = [int(uid.strip()) for uid in update.message.text.split(',')]
+        context.user_data['coupon_user_ids'] = user_ids
+        
+        await update.message.reply_text(
+            f"✅ {len(user_ids)}명의 사용자\n\n"
+            "쿠폰 제목을 입력하세요:\n"
+            "(예: 신규가입 축하 쿠폰)"
+        )
+        return COUPON_TITLE
+        
+    except ValueError:
+        await update.message.reply_text("올바른 숫자를 입력하세요.")
+        return COUPON_USER_ID
+
+
+async def coupon_title_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """쿠폰 제목 입력"""
+    context.user_data['coupon_title'] = update.message.text.strip()
+    
+    await update.message.reply_text(
+        "쿠폰 설명을 입력하세요:\n"
+        "(예: 첫 게임 참여 시 사용 가능)"
+    )
+    return COUPON_DESC
+
+
+async def coupon_desc_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """쿠폰 설명 입력"""
+    context.user_data['coupon_desc'] = update.message.text.strip()
+    
+    await update.message.reply_text(
+        "할인 금액을 입력하세요 (숫자만):\n"
+        "(예: 10000)"
+    )
+    return COUPON_AMOUNT
+
+
+async def coupon_amount_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """할인 금액 입력"""
+    try:
+        amount = int(update.message.text.strip())
+        context.user_data['coupon_amount'] = amount
+        
+        await update.message.reply_text(
+            "유효 기간을 입력하세요 (일 수):\n"
+            "(예: 30 = 30일 후 만료)\n"
+            "무제한이면 0 입력"
+        )
+        return COUPON_EXPIRES
+        
+    except ValueError:
+        await update.message.reply_text("숫자를 입력하세요.")
+        return COUPON_AMOUNT
+
+
+async def coupon_expires_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """유효기간 입력 및 쿠폰 생성"""
+    from datetime import timedelta
+    import random
+    import string
+    
+    try:
+        days = int(update.message.text.strip())
+        expires_at = None if days == 0 else datetime.utcnow() + timedelta(days=days)
+        
+        db = SessionLocal()
+        
+        try:
+            user_ids = context.user_data['coupon_user_ids']
+            title = context.user_data['coupon_title']
+            desc = context.user_data['coupon_desc']
+            amount = context.user_data['coupon_amount']
+            
+            created_count = 0
+            for user_id in user_ids:
+                # 사용자 확인/생성
+                user = db.query(User).filter(User.user_id == user_id).first()
+                if not user:
+                    user = User(user_id=user_id)
+                    db.add(user)
+                    db.commit()
+                
+                # 쿠폰 코드 생성
+                coupon_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=10))
+                
+                coupon = Coupon(
+                    user_id=user_id,
+                    coupon_code=coupon_code,
+                    title=title,
+                    description=desc,
+                    discount_amount=amount,
+                    expires_at=expires_at
+                )
+                db.add(coupon)
+                created_count += 1
+            
+            db.commit()
+            
+            await update.message.reply_text(
+                f"✅ *쿠폰 발급 완료!*\n\n"
+                f"📝 제목: {title}\n"
+                f"💰 금액: {amount:,}원\n"
+                f"👥 발급 인원: {created_count}명\n"
+                f"⏰ 유효기간: {'무제한' if days == 0 else f'{days}일'}",
+                parse_mode="Markdown"
+            )
+            
+            logger.info(f"Created {created_count} coupons: {title}")
+            print(f"[ADMIN] Created {created_count} coupons: {title}")
+        except Exception as e:
+            logger.error(f"Error creating coupons: {e}", exc_info=True)
+            await update.message.reply_text("❌ 쿠폰 발급 중 오류가 발생했습니다.")
+            db.rollback()
+        finally:
+            db.close()
+        
+    except ValueError:
+        await update.message.reply_text("숫자를 입력하세요.")
+        return COUPON_EXPIRES
+    
+    # 사용자 데이터 정리
+    context.user_data.pop('coupon_user_ids', None)
+    context.user_data.pop('coupon_title', None)
+    context.user_data.pop('coupon_desc', None)
+    context.user_data.pop('coupon_amount', None)
+    
+    return ConversationHandler.END
+
+
+async def coupon_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """쿠폰 발급 취소"""
+    context.user_data.pop('coupon_user_ids', None)
+    context.user_data.pop('coupon_title', None)
+    context.user_data.pop('coupon_desc', None)
+    context.user_data.pop('coupon_amount', None)
+    await update.message.reply_text("쿠폰 발급이 취소되었습니다.")
+    return ConversationHandler.END
+
+
+def build_coupon_conversation() -> ConversationHandler:
+    """쿠폰 발급용 ConversationHandler 인스턴스 생성."""
+    return ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(admin_create_coupon_start, pattern="^admin_create_coupon$")
+        ],
+        states={
+            COUPON_USER_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, coupon_user_id_input)],
+            COUPON_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, coupon_title_input)],
+            COUPON_DESC: [MessageHandler(filters.TEXT & ~filters.COMMAND, coupon_desc_input)],
+            COUPON_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, coupon_amount_input)],
+            COUPON_EXPIRES: [MessageHandler(filters.TEXT & ~filters.COMMAND, coupon_expires_input)],
+        },
+        fallbacks=[
+            CommandHandler("cancel", coupon_cancel),
+            MessageHandler(filters.COMMAND, coupon_cancel),
+        ],
+    )
+
+
+# ==============================
+# 이벤트 관리 기능
+# ==============================
+
+
+async def admin_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """이벤트 관리 메뉴"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    await query.answer()
+    
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    keyboard = [
+        [InlineKeyboardButton("➕ 이벤트 작성", callback_data="admin_create_event")],
+        [InlineKeyboardButton("📋 이벤트 목록", callback_data="admin_list_events")],
+        [InlineKeyboardButton("« 뒤로", callback_data="admin_menu")]
+    ]
+    
+    await query.edit_message_text(
+        "🎉 *이벤트 관리*\n\n"
+        "원하는 작업을 선택하세요:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode="Markdown"
+    )
+
+
+async def admin_create_event_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """이벤트 작성 시작"""
+    query = update.callback_query
+    if not query:
+        return ConversationHandler.END
+    
+    await query.answer()
+    
+    logger.info("[EVENT] Starting event creation")
+    print("[ADMIN] Starting event creation")
+    
+    await query.edit_message_text(
+        "🎉 *이벤트 작성*\n\n"
+        "이벤트 제목을 입력하세요:\n\n"
+        "취소: /cancel",
+        parse_mode="Markdown"
+    )
+    
+    return EVENT_TITLE
+
+
+async def event_title_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """이벤트 제목 입력"""
+    context.user_data['event_title'] = update.message.text.strip()
+    
+    await update.message.reply_text(
+        "이벤트 내용을 입력하세요:\n"
+        "(여러 줄 가능)"
+    )
+    return EVENT_CONTENT
+
+
+async def event_content_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """이벤트 내용 입력"""
+    context.user_data['event_content'] = update.message.text.strip()
+    
+    await update.message.reply_text(
+        "이미지 URL을 입력하세요:\n"
+        "(JPG, PNG, GIF 모두 가능)\n\n"
+        "이미지가 없으면 'skip' 입력"
+    )
+    return EVENT_IMAGE
+
+
+async def event_image_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """이미지 URL 입력 및 이벤트 생성"""
+    image_url = update.message.text.strip()
+    if image_url.lower() == 'skip':
+        image_url = None
+    
+    db = SessionLocal()
+    
+    try:
+        event = Event(
+            title=context.user_data['event_title'],
+            content=context.user_data['event_content'],
+            image_url=image_url
+        )
+        db.add(event)
+        db.commit()
+        
+        event_id = event.id
+        
+        await update.message.reply_text(
+            f"✅ *이벤트 등록 완료!*\n\n"
+            f"📝 제목: {context.user_data['event_title']}\n"
+            f"🆔 ID: {event_id}",
+            parse_mode="Markdown"
+        )
+        
+        logger.info(f"Created event: {event_id}")
+        print(f"[ADMIN] Event created: id={event_id}")
+    except Exception as e:
+        logger.error(f"Error creating event: {e}", exc_info=True)
+        await update.message.reply_text("❌ 이벤트 등록 중 오류가 발생했습니다.")
+        db.rollback()
+    finally:
+        db.close()
+    
+    # 사용자 데이터 정리
+    context.user_data.pop('event_title', None)
+    context.user_data.pop('event_content', None)
+    
+    return ConversationHandler.END
+
+
+async def event_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """이벤트 작성 취소"""
+    context.user_data.pop('event_title', None)
+    context.user_data.pop('event_content', None)
+    await update.message.reply_text("이벤트 작성이 취소되었습니다.")
+    return ConversationHandler.END
+
+
+def build_event_conversation() -> ConversationHandler:
+    """이벤트 작성용 ConversationHandler 인스턴스 생성."""
+    return ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(admin_create_event_start, pattern="^admin_create_event$")
+        ],
+        states={
+            EVENT_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, event_title_input)],
+            EVENT_CONTENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, event_content_input)],
+            EVENT_IMAGE: [MessageHandler(filters.TEXT & ~filters.COMMAND, event_image_input)],
+        },
+        fallbacks=[
+            CommandHandler("cancel", event_cancel),
+            MessageHandler(filters.COMMAND, event_cancel),
         ],
     )
 

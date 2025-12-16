@@ -22,7 +22,9 @@ from sqlalchemy import (
     Text,
     DateTime,
     ForeignKey,
+    Boolean,
     create_engine,
+    func,
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker, Session
 
@@ -71,7 +73,7 @@ class Room(Base):
     description = Column(Text)
     status = Column(String(20), default="active")
     current_players = Column(Integer, default=0)
-    max_players = Column(Integer, default=9)
+    max_players = Column(Integer, default=10)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
 
@@ -121,6 +123,42 @@ class Banner(Base):
     order_num = Column(Integer, default=0)
     status = Column(String(20), default="active")
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Coupon(Base):
+    """쿠폰 테이블."""
+
+    __tablename__ = "coupons"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(BigInteger, ForeignKey("users.user_id"))
+    coupon_code = Column(String(50), unique=True, nullable=False)
+    title = Column(String(200), nullable=False)
+    description = Column(Text)
+    discount_amount = Column(Integer)  # 할인 금액 또는 포인트
+    is_used = Column(Boolean, default=False)
+    used_at = Column(DateTime(timezone=True))
+    expires_at = Column(DateTime(timezone=True))
+    # PostgreSQL 호환 datetime 설정
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", backref="coupons")
+
+
+class Event(Base):
+    """이벤트 테이블."""
+
+    __tablename__ = "events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    image_url = Column(Text)  # 이미지 또는 GIF URL
+    status = Column(String(20), default="active")  # active, inactive
+    priority = Column(Integer, default=0)  # 노출 우선순위
+    # PostgreSQL 호환 datetime 설정
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 def init_db() -> None:

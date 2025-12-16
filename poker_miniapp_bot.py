@@ -364,6 +364,10 @@ def main() -> None:
         build_event_conversation,
         admin_delete_room_confirm,
         admin_list_coupons_callback,
+        admin_list_events,
+        admin_event_detail,
+        admin_event_delete,
+        admin_event_toggle,
     )
 
     application.add_handler(CommandHandler("admin", admin_menu))
@@ -382,6 +386,12 @@ def main() -> None:
     
     # 쿠폰 목록 조회 콜백 핸들러
     application.add_handler(CallbackQueryHandler(admin_list_coupons_callback, pattern="^admin_list_coupons$"))
+    
+    # 이벤트 관련 콜백 핸들러
+    application.add_handler(CallbackQueryHandler(admin_list_events, pattern="^admin_list_events$"))
+    application.add_handler(CallbackQueryHandler(admin_event_detail, pattern="^event_detail_"))
+    application.add_handler(CallbackQueryHandler(admin_event_delete, pattern="^event_delete_"))
+    application.add_handler(CallbackQueryHandler(admin_event_toggle, pattern="^event_toggle_"))
     
     # 방 삭제 콜백 핸들러 (delete_room_ 패턴)
     application.add_handler(CallbackQueryHandler(admin_delete_room_confirm, pattern="^delete_room_"))

@@ -24,91 +24,6 @@ async function fetchJSON(url, options = {}) {
     return res.json();
 }
 
-async function loadBanners() {
-    try {
-        const banners = await fetchJSON("/api/banners");
-        const container = document.getElementById("banner-container");
-        container.innerHTML = "";
-
-        console.log("[배너] API 응답:", banners);
-        console.log("[배너] 배너 개수:", banners.length);
-
-        if (!banners.length) {
-            // DB에 배너가 없을 때 기본 메시지 표시
-            const slide = document.createElement("div");
-            slide.className = "swiper-slide banner-slide";
-            slide.innerHTML = `
-                <div class="banner-placeholder">
-                    <h2>배너를 추가해주세요</h2>
-                    <p>관리자에게 문의: @royalswap_kr</p>
-                    <p style="font-size: 11px; opacity: 0.7; margin-top: 8px;">/admin → 🎨 배너 관리</p>
-                </div>
-            `;
-            container.appendChild(slide);
-            console.log("[배너] 배너가 없어 기본 메시지 표시");
-        } else {
-            for (const b of banners) {
-                const slide = document.createElement("div");
-                slide.className = "swiper-slide banner-slide";
-
-                const imageUrl = b.image_url || "";
-                const linkUrl = b.link_url || "#";
-                const bannerTitle = b.title || "배너";
-                const bannerDesc = b.description || "";
-
-                console.log(`[배너] 로딩 시도: ID=${b.id}, URL=${imageUrl}`);
-
-                // 배너 전체를 클릭 가능한 링크로 처리
-                // GIF, PNG, JPG 모두 지원 (GIF는 자동으로 애니메이션 재생됨)
-                // 이미지 로딩 에러 시 플레이스홀더 표시
-                slide.innerHTML = `
-                    <a class="banner-image-link" href="${linkUrl}" target="_blank" rel="noopener noreferrer">
-                        <img 
-                            src="${imageUrl}" 
-                            alt="${bannerTitle}" 
-                            class="banner-image" 
-                            loading="lazy"
-                            onerror="console.error('[배너] 이미지 로딩 실패:', '${imageUrl}'); this.style.display='none'; const placeholder = this.parentElement.querySelector('.banner-placeholder'); if (placeholder) placeholder.style.display='flex';"
-                        />
-                        <div class="banner-placeholder" style="display:none;">
-                            <h2>${bannerTitle}</h2>
-                            ${bannerDesc ? `<p>${bannerDesc}</p>` : ""}
-                            <p style="font-size: 11px; opacity: 0.7; margin-top: 8px;">@royalswap_kr</p>
-                        </div>
-                        <div class="banner-overlay">
-                            ${b.title ? `<div class="banner-title">${b.title}</div>` : ""}
-                            ${b.description ? `<div class="banner-desc">${b.description}</div>` : ""}
-                            ${b.link_url ? `<div class="banner-link-text">${b.link_url}</div>` : ""}
-                        </div>
-                    </a>
-                `;
-                container.appendChild(slide);
-            }
-        }
-
-        if (swiperInstance) {
-            swiperInstance.update();
-        } else {
-            swiperInstance = new Swiper(".banner-swiper", {
-                loop: true,
-                autoplay: {
-                    delay: 4000, // 4초마다 자동 슬라이드
-                    disableOnInteraction: false,
-                },
-                pagination: {
-                    el: ".swiper-pagination",
-                    clickable: true,
-                },
-                navigation: {
-                    nextEl: ".swiper-button-next",
-                    prevEl: ".swiper-button-prev",
-                },
-            });
-        }
-    } catch (e) {
-        console.error("배너 로드 실패:", e);
-    }
-}
 
 function renderRooms(rooms) {
     const list = document.getElementById("room-list");
@@ -274,16 +189,208 @@ function setupNav() {
     }
 }
 
+// 로딩 인디케이터
+function showLoading() {
+    const indicator = document.getElementById('loadingIndicator');
+    if (indicator) {
+        indicator.style.display = 'block';
+    }
+}
+
+function hideLoading() {
+    const indicator = document.getElementById('loadingIndicator');
+    if (indicator) {
+        indicator.style.display = 'none';
+    }
+}
+
+// 병렬 데이터 로딩 (배너 + 방 동시)
+async function loadData() {
+    console.log('[LOAD] 데이터 로딩 시작');
+    const startTime = performance.now();
+    
+    showLoading();
+    
+    try {
+        // 배너와 방 데이터 동시 요청
+        const [bannersResponse, roomsResponse] = await Promise.all([
+            fetch('/api/banners'),
+            fetch('/api/rooms')
+        ]);
+        
+        if (!bannersResponse.ok || !roomsResponse.ok) {
+            throw new Error('API 응답 실패');
+        }
+        
+        const banners = await bannersResponse.json();
+        const rooms = await roomsResponse.json();
+        
+        console.log('[LOAD] 배너:', banners.length, '개');
+        console.log('[LOAD] 방:', rooms.length, '개');
+        
+        // 배너 표시
+        await displayBanners(banners);
+        
+        // 방 표시
+        renderRooms(rooms);
+        
+        const endTime = performance.now();
+        console.log(`[LOAD] 로딩 완료: ${(endTime - startTime).toFixed(0)}ms`);
+        
+    } catch (error) {
+        console.error('[LOAD] 데이터 로딩 실패:', error);
+        // 에러 시 빈 상태 표시
+        const list = document.getElementById("room-list");
+        if (list) {
+            list.innerHTML = '<div class="welcome-card"><p>데이터를 불러올 수 없습니다.</p></div>';
+        }
+    } finally {
+        hideLoading();
+    }
+}
+
+// displayBanners 함수를 async로 변경
+async function displayBanners(banners) {
+    const container = document.getElementById("banner-container");
+    if (!container) return;
+    
+    container.innerHTML = "";
+
+    console.log("[배너] API 응답:", banners);
+    console.log("[배너] 배너 개수:", banners.length);
+
+    if (!banners.length) {
+        const slide = document.createElement("div");
+        slide.className = "swiper-slide banner-slide";
+        slide.innerHTML = `
+            <div class="banner-placeholder">
+                <h2>배너를 추가해주세요</h2>
+                <p>관리자에게 문의: @royalswap_kr</p>
+                <p style="font-size: 11px; opacity: 0.7; margin-top: 8px;">/admin → 🎨 배너 관리</p>
+            </div>
+        `;
+        container.appendChild(slide);
+        console.log("[배너] 배너가 없어 기본 메시지 표시");
+    } else {
+        for (const b of banners) {
+            const slide = document.createElement("div");
+            slide.className = "swiper-slide banner-slide";
+
+            const imageUrl = b.image_url || "";
+            const linkUrl = b.link_url || "#";
+            const bannerTitle = b.title || "배너";
+            const bannerDesc = b.description || "";
+
+            console.log(`[배너] 로딩 시도: ID=${b.id}, URL=${imageUrl}`);
+
+            slide.innerHTML = `
+                <a class="banner-image-link" href="${linkUrl}" target="_blank" rel="noopener noreferrer">
+                    <img 
+                        src="${imageUrl}" 
+                        alt="${bannerTitle}" 
+                        class="banner-image" 
+                        loading="lazy"
+                        onerror="console.error('[배너] 이미지 로딩 실패:', '${imageUrl}'); this.style.display='none'; const placeholder = this.parentElement.querySelector('.banner-placeholder'); if (placeholder) placeholder.style.display='flex';"
+                    />
+                    <div class="banner-placeholder" style="display:none;">
+                        <h2>${bannerTitle}</h2>
+                        ${bannerDesc ? `<p>${bannerDesc}</p>` : ""}
+                        <p style="font-size: 11px; opacity: 0.7; margin-top: 8px;">@royalswap_kr</p>
+                    </div>
+                    <div class="banner-overlay">
+                        ${b.title ? `<div class="banner-title">${b.title}</div>` : ""}
+                        ${b.description ? `<div class="banner-desc">${b.description}</div>` : ""}
+                        ${b.link_url ? `<div class="banner-link-text">${b.link_url}</div>` : ""}
+                    </div>
+                </a>
+            `;
+            container.appendChild(slide);
+        }
+    }
+
+    // Swiper 초기화/업데이트
+    if (swiperInstance) {
+        swiperInstance.update();
+    } else {
+        swiperInstance = new Swiper(".banner-swiper", {
+            loop: true,
+            autoplay: {
+                delay: 4000,
+                disableOnInteraction: false,
+            },
+            pagination: {
+                el: ".swiper-pagination",
+                clickable: true,
+            },
+            navigation: {
+                nextEl: ".swiper-button-next",
+                prevEl: ".swiper-button-prev",
+            },
+        });
+    }
+}
+
+// 캐시를 활용한 데이터 로딩 (5분 유효)
+async function loadDataWithCache() {
+    const CACHE_KEY = 'poker_data_cache';
+    const CACHE_DURATION = 5 * 60 * 1000; // 5분
+    
+    // 캐시 확인
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+        try {
+            const { data, timestamp } = JSON.parse(cached);
+            if (Date.now() - timestamp < CACHE_DURATION) {
+                console.log('[CACHE] 캐시된 데이터 사용');
+                await displayBanners(data.banners);
+                renderRooms(data.rooms);
+                // 백그라운드에서 새 데이터 가져오기
+                loadData().catch(e => console.error('[CACHE] 백그라운드 업데이트 실패:', e));
+                return;
+            }
+        } catch (e) {
+            console.warn('[CACHE] 캐시 파싱 실패:', e);
+        }
+    }
+    
+    // 새 데이터 로드
+    await loadData();
+    
+    // 캐시 저장 (성공 시)
+    try {
+        const bannersResponse = await fetch('/api/banners');
+        const roomsResponse = await fetch('/api/rooms');
+        if (bannersResponse.ok && roomsResponse.ok) {
+            const banners = await bannersResponse.json();
+            const rooms = await roomsResponse.json();
+            localStorage.setItem(CACHE_KEY, JSON.stringify({
+                data: { banners, rooms },
+                timestamp: Date.now()
+            }));
+            console.log('[CACHE] 데이터 캐시 저장');
+        }
+    } catch (e) {
+        console.warn('[CACHE] 캐시 저장 실패:', e);
+    }
+}
+
 function startAutoRefresh() {
-    loadRooms();
-    setInterval(loadRooms, 3000);
+    // 3초마다 방 목록만 갱신 (배너는 캐시 사용)
+    setInterval(async () => {
+        try {
+            const rooms = await fetchJSON("/api/rooms");
+            renderRooms(rooms);
+            console.log('[AUTO_REFRESH] 방 목록 갱신');
+        } catch (e) {
+            console.error("[AUTO_REFRESH] 방 목록 갱신 실패:", e);
+        }
+    }, 3000);
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
     initTelegram();
     setupNav();
-    await loadBanners();
-    await loadRooms();
+    await loadDataWithCache();
     startAutoRefresh();
 });
 

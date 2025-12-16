@@ -10,8 +10,10 @@
       href="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.css"
     />
     <link rel="stylesheet" href="/static/css/style.css" />
-    <!-- URL 파라미터 유지 스크립트 -->
-    <script src="/static/js/url-params.js"></script>
+    <!-- Telegram WebApp SDK (필수, 먼저 로드) -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- URL 파라미터 유지 스크립트 (defer로 지연 로드) -->
+    <script src="/static/js/url-params.js" defer></script>
     <script>
         // 페이지 로드 즉시 URL 파라미터를 프로필 링크에 추가 (즉시 실행)
         (function() {
@@ -138,6 +140,21 @@
             <button id="close-profile" class="btn primary">닫기</button>
         </div>
     </div>
+    
+    <!-- 로딩 인디케이터 -->
+    <div id="loadingIndicator" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 20px 30px; border-radius: 16px; color: white; z-index: 9999; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+        <div style="text-align: center;">
+            <div style="font-size: 32px; margin-bottom: 10px; animation: spin 1s linear infinite;">⏳</div>
+            <div style="font-size: 14px; font-weight: 500;">로딩 중...</div>
+        </div>
+    </div>
+    
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </div>
 
 <!-- Swiper JS (CDN) -->

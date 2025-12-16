@@ -764,6 +764,10 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
         # ConversationHandler가 처리
         return
 
+    if data == "admin_list_events":
+        # 별도 콜백 핸들러에서 처리 (poker_miniapp_bot.py)
+        return
+
     if data == "admin_stats":
         db = SessionLocal()
         try:
@@ -1065,10 +1069,10 @@ async def admin_edit_room_list(update: Update, context: ContextTypes.DEFAULT_TYP
         keyboard.append([InlineKeyboardButton("« 뒤로", callback_data="admin_menu")])
         
         await query.edit_message_text(
-            "✏️ *방 수정*\n\n"
+            "✏️ <b>방 수정</b>\n\n"
             "수정할 방을 선택하세요:",
             reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
     finally:
         db.close()
@@ -1096,9 +1100,21 @@ async def admin_edit_room_select(update: Update, context: ContextTypes.DEFAULT_T
         
         from telegram import InlineKeyboardMarkup, InlineKeyboardButton
         
+        # HTML 이스케이프
+        from html import escape
+        name = escape(room.room_name)
+        url = escape(room.room_url)
+        blinds = escape(room.blinds or '-')
+        buyin = escape(room.min_buyin or '-')
+        game_time = escape(room.game_time or '-')
+        contact = escape(room.contact_telegram or '-')
+        
         keyboard = [
             [InlineKeyboardButton("📝 방 이름", callback_data="edit_field_name")],
             [InlineKeyboardButton("🔗 방 URL", callback_data="edit_field_url")],
+            [InlineKeyboardButton("💰 블라인드", callback_data="edit_field_blinds")],
+            [InlineKeyboardButton("💵 최소 바이인", callback_data="edit_field_min_buyin")],
+            [InlineKeyboardButton("⏰ 게임 시간", callback_data="edit_field_game_time")],
             [InlineKeyboardButton("📱 담당자 ID", callback_data="edit_field_contact")],
             [InlineKeyboardButton("👥 최대 인원", callback_data="edit_field_max_players")],
             [InlineKeyboardButton("👤 현재 인원", callback_data="edit_field_current_players")],
@@ -1106,19 +1122,20 @@ async def admin_edit_room_select(update: Update, context: ContextTypes.DEFAULT_T
             [InlineKeyboardButton("« 취소", callback_data="admin_update_room")]
         ]
         
-        contact_text = f"@{room.contact_telegram}" if room.contact_telegram else "미설정"
-        
         await query.edit_message_text(
-            f"✏️ *방 수정: {room.room_name}*\n\n"
-            f"📝 이름: {room.room_name}\n"
-            f"🔗 URL: {room.room_url}\n"
-            f"📱 담당자: {contact_text}\n"
-            f"👥 최대 인원: {room.max_players}\n"
-            f"👤 현재 인원: {room.current_players}\n"
-            f"🔄 상태: {room.status}\n\n"
+            f"✏️ <b>방 수정: {name}</b>\n\n"
+            f"<b>방 이름:</b> {name}\n"
+            f"<b>방 URL:</b> {url}\n"
+            f"<b>블라인드:</b> {blinds}\n"
+            f"<b>최소 바이인:</b> {buyin}\n"
+            f"<b>게임 시간:</b> {game_time}\n"
+            f"<b>담당자:</b> {contact}\n"
+            f"<b>최대 인원:</b> {room.max_players}\n"
+            f"<b>현재 인원:</b> {room.current_players}\n"
+            f"<b>상태:</b> {room.status}\n\n"
             "수정할 항목을 선택하세요:",
             reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         
         return EDIT_ROOM_FIELD
@@ -1141,6 +1158,9 @@ async def admin_edit_room_field(update: Update, context: ContextTypes.DEFAULT_TY
     field_names = {
         'name': '방 이름',
         'url': '방 URL',
+        'blinds': '블라인드',
+        'min_buyin': '최소 바이인',
+        'game_time': '게임 시간',
         'contact': '담당자 텔레그램 ID',
         'max_players': '최대 인원',
         'current_players': '현재 인원',
@@ -1158,18 +1178,20 @@ async def admin_edit_room_field(update: Update, context: ContextTypes.DEFAULT_TY
         ]
         
         await query.edit_message_text(
-            "🔄 *상태 변경*\n\n"
+            "🔄 <b>상태 변경</b>\n\n"
             "변경할 상태를 선택하세요:",
             reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         return EDIT_ROOM_FIELD
     else:
+        from html import escape
+        field_name_escaped = escape(field_names[field])
         await query.edit_message_text(
-            f"✏️ *{field_names[field]} 수정*\n\n"
-            f"새로운 {field_names[field]}을(를) 입력하세요:\n\n"
+            f"✏️ <b>{field_name_escaped} 수정</b>\n\n"
+            f"새로운 {field_name_escaped}을(를) 입력하세요:\n\n"
             "취소: /cancel",
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
         return EDIT_ROOM_VALUE
 
@@ -1200,11 +1222,13 @@ async def admin_edit_room_status(update: Update, context: ContextTypes.DEFAULT_T
             
             status_text = "활성" if new_status == "active" else "비활성"
             
+            from html import escape
+            room_name_escaped = escape(room.room_name)
             await query.edit_message_text(
-                f"✅ *상태 변경 완료!*\n\n"
-                f"방 이름: {room.room_name}\n"
+                f"✅ <b>상태 변경 완료!</b>\n\n"
+                f"방 이름: {room_name_escaped}\n"
                 f"상태: {status_text}",
-                parse_mode="Markdown"
+                parse_mode="HTML"
             )
             
             logger.info(f"[ADMIN] 방 상태 변경: {room_id} → {new_status}")
@@ -1244,6 +1268,12 @@ async def admin_edit_room_value(update: Update, context: ContextTypes.DEFAULT_TY
                 await update.message.reply_text("올바른 URL을 입력하세요 (http:// 또는 https://)")
                 return EDIT_ROOM_VALUE
             room.room_url = new_value
+        elif field == 'blinds':
+            room.blinds = new_value
+        elif field == 'min_buyin':
+            room.min_buyin = new_value
+        elif field == 'game_time':
+            room.game_time = new_value
         elif field == 'contact':
             # @ 기호 제거 및 스킵 처리
             if new_value.lower() in ["skip", "스킵", "없음", "-"]:
@@ -1276,16 +1306,24 @@ async def admin_edit_room_value(update: Update, context: ContextTypes.DEFAULT_TY
         field_names = {
             'name': '방 이름',
             'url': '방 URL',
-            'contact': '담당자 텔레그램 ID',
+            'blinds': '블라인드',
+            'min_buyin': '최소 바이인',
+            'game_time': '게임 시간',
+            'contact': '담당자 ID',
             'max_players': '최대 인원',
             'current_players': '현재 인원'
         }
         
+        from html import escape
+        field_name_escaped = escape(field_names[field])
+        room_name_escaped = escape(room.room_name)
+        new_value_escaped = escape(new_value)
+        
         await update.message.reply_text(
-            f"✅ *{field_names[field]} 수정 완료!*\n\n"
-            f"방 이름: {room.room_name}\n"
-            f"새로운 값: {new_value}",
-            parse_mode="Markdown"
+            f"✅ <b>{field_name_escaped} 수정 완료!</b>\n\n"
+            f"방 이름: {room_name_escaped}\n"
+            f"새로운 값: {new_value_escaped}",
+            parse_mode="HTML"
         )
         
         logger.info(f"[ADMIN] 방 수정: {room_id}, {field} → {new_value}")
@@ -1810,11 +1848,181 @@ async def admin_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     ]
     
     await query.edit_message_text(
-        "🎉 *이벤트 관리*\n\n"
+        "🎉 <b>이벤트 관리</b>\n\n"
         "원하는 작업을 선택하세요:",
         reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
+        parse_mode="HTML"
     )
+
+
+async def admin_list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """이벤트 목록 조회"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    await query.answer()
+    
+    logger.info("[ADMIN] 이벤트 목록 조회 시작")
+    print(f"[ADMIN] 이벤트 목록 조회: user_id={query.from_user.id if query.from_user else None}")
+    
+    db = SessionLocal()
+    
+    try:
+        events = db.query(Event).order_by(Event.created_at.desc()).limit(10).all()
+        
+        if not events:
+            from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+            await query.edit_message_text(
+                "등록된 이벤트가 없습니다.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("« 뒤로", callback_data="admin_events")]
+                ])
+            )
+            return
+        
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        keyboard = []
+        for event in events:
+            status_emoji = "✅" if event.status == "active" else "❌"
+            # 제목 길이 제한
+            title = event.title[:30] + "..." if len(event.title) > 30 else event.title
+            keyboard.append([InlineKeyboardButton(
+                f"{status_emoji} {title}",
+                callback_data=f"event_detail_{event.id}"
+            )])
+        
+        keyboard.append([InlineKeyboardButton("« 뒤로", callback_data="admin_events")])
+        
+        await query.edit_message_text(
+            "📋 <b>이벤트 목록</b>\n\n"
+            "이벤트를 선택하여 수정/삭제하세요:",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+        
+    finally:
+        db.close()
+
+
+async def admin_event_detail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """이벤트 상세 및 수정/삭제"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    await query.answer()
+    
+    event_id = int(query.data.split("_")[-1])
+    
+    db = SessionLocal()
+    
+    try:
+        event = db.query(Event).filter(Event.id == event_id).first()
+        
+        if not event:
+            await query.edit_message_text("이벤트를 찾을 수 없습니다.")
+            return
+        
+        # HTML 이스케이프 (특수문자 처리)
+        from html import escape
+        title = escape(event.title)
+        content = escape(event.content)
+        
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        keyboard = [
+            [InlineKeyboardButton("🗑 삭제", callback_data=f"event_delete_{event_id}")],
+            [InlineKeyboardButton("🔄 상태 변경", callback_data=f"event_toggle_{event_id}")],
+            [InlineKeyboardButton("« 목록", callback_data="admin_list_events")]
+        ]
+        
+        status_text = "활성" if event.status == "active" else "비활성"
+        image_text = "있음" if event.image_url else "없음"
+        
+        await query.edit_message_text(
+            f"📋 <b>이벤트 상세</b>\n\n"
+            f"<b>제목:</b> {title}\n\n"
+            f"<b>내용:</b>\n{content}\n\n"
+            f"<b>이미지:</b> {image_text}\n"
+            f"<b>상태:</b> {status_text}\n"
+            f"<b>작성일:</b> {event.created_at.strftime('%Y-%m-%d')}\n",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="HTML"
+        )
+        
+    finally:
+        db.close()
+
+
+async def admin_event_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """이벤트 삭제"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    await query.answer()
+    
+    event_id = int(query.data.split("_")[-1])
+    
+    db = SessionLocal()
+    
+    try:
+        event = db.query(Event).filter(Event.id == event_id).first()
+        
+        if event:
+            from html import escape
+            title = escape(event.title)
+            db.delete(event)
+            db.commit()
+            
+            await query.edit_message_text(
+                f"✅ <b>이벤트 삭제 완료</b>\n\n"
+                f"제목: {title}",
+                parse_mode="HTML"
+            )
+            
+            logger.info(f"[ADMIN] Deleted event: {event_id}")
+        
+    finally:
+        db.close()
+
+
+async def admin_event_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """이벤트 상태 변경"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    await query.answer()
+    
+    event_id = int(query.data.split("_")[-1])
+    
+    db = SessionLocal()
+    
+    try:
+        event = db.query(Event).filter(Event.id == event_id).first()
+        
+        if event:
+            event.status = "inactive" if event.status == "active" else "active"
+            db.commit()
+            
+            from html import escape
+            status_text = "활성" if event.status == "active" else "비활성"
+            title = escape(event.title)
+            
+            await query.edit_message_text(
+                f"✅ <b>상태 변경 완료</b>\n\n"
+                f"제목: {title}\n"
+                f"새 상태: {status_text}",
+                parse_mode="HTML"
+            )
+            
+            logger.info(f"[ADMIN] Toggle event status: {event_id} → {event.status}")
+        
+    finally:
+        db.close()
 
 
 async def admin_create_event_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:

@@ -1,4 +1,176 @@
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프로필 - TTPOKER</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0f1014;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding-bottom: 80px;
+        }
+        .profile-container {
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .profile-header {
+            text-align: center;
+            padding: 30px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            margin-bottom: 20px;
+        }
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            margin: 0 auto 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+        .profile-name {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .profile-id {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .menu-section {
+            background: #1e2139;
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 18px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            cursor: pointer;
+            transition: background 0.2s;
+            text-decoration: none;
+            color: white;
+        }
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+        .menu-item:active {
+            background: rgba(255,255,255,0.05);
+        }
+        .menu-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(102, 126, 234, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 20px;
+        }
+        .menu-content {
+            flex: 1;
+        }
+        .menu-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+        .menu-desc {
+            font-size: 13px;
+            color: #8b92b0;
+        }
+        .menu-arrow {
+            color: #8b92b0;
+            font-size: 18px;
+        }
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #16172d;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            padding: 10px 0;
+            z-index: 100;
+        }
+        .nav-item {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            color: #8b92b0;
+            text-decoration: none;
+            font-size: 12px;
+        }
+        .nav-item.active {
+            color: #667eea;
+        }
+        .nav-icon {
+            font-size: 24px;
+            display: block;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="profile-container">
+        <div class="profile-header">
+            <div class="profile-avatar">👤</div>
+            <div class="profile-name" id="userName">사용자</div>
+            <div class="profile-id" id="userId">로딩 중...</div>
+        </div>
+        <div class="menu-section">
+            <div class="menu-item" onclick="handleCoupon(event)">
+                <div class="menu-icon">🎟️</div>
+                <div class="menu-content">
+                    <div class="menu-title">쿠폰함</div>
+                    <div class="menu-desc">보유 쿠폰 확인</div>
+                </div>
+                <div class="menu-arrow">›</div>
+            </div>
+            <div class="menu-item" onclick="handleEvent(event)">
+                <div class="menu-icon">🎉</div>
+                <div class="menu-content">
+                    <div class="menu-title">이벤트</div>
+                    <div class="menu-desc">진행중인 이벤트 확인</div>
+                </div>
+                <div class="menu-arrow">›</div>
+            </div>
+            <div class="menu-item" onclick="openTelegramProfile(event)">
+                <div class="menu-icon">📱</div>
+                <div class="menu-content">
+                    <div class="menu-title">텔레그램 프로필</div>
+                    <div class="menu-desc">텔레그램 계정 정보</div>
+                </div>
+                <div class="menu-arrow">›</div>
+            </div>
+        </div>
+    </div>
+    <div class="bottom-nav">
+        <a href="/" class="nav-item">
+            <span class="nav-icon">🏠</span>
+            <span>홈</span>
+        </a>
+        <a href="/profile" class="nav-item active">
+            <span class="nav-icon">👤</span>
+            <span>프로필</span>
+        </a>
+    </div>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
         let tg;
         try {
@@ -8,11 +180,13 @@
         } catch (e) {
             console.error('Telegram WebApp 초기화 실패:', e);
         }
-        
         function updateUserInfo() {
             const userNameEl = document.getElementById('userName');
             const userIdEl = document.getElementById('userId');
-            
+            if (!userNameEl || !userIdEl) {
+                console.error('userName 또는 userId 요소를 찾을 수 없습니다');
+                return;
+            }
             if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
                 const user = tg.initDataUnsafe.user;
                 userNameEl.textContent = (user.first_name || '') + (user.last_name ? ' ' + user.last_name : '') || '사용자';
@@ -23,42 +197,50 @@
                 setTimeout(updateUserInfo, 500);
             }
         }
-        
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', updateUserInfo);
         } else {
             updateUserInfo();
         }
-        
         async function handleCoupon(e) {
             e.preventDefault();
             if (!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user) {
                 alert('사용자 정보를 가져올 수 없습니다.');
                 return;
             }
-            const response = await fetch('/api/coupons/' + tg.initDataUnsafe.user.id);
-            const coupons = await response.json();
-            if (coupons.length === 0) {
-                tg.showAlert('보유한 쿠폰이 없습니다.');
-            } else {
-                let msg = '🎟️ 보유 쿠폰 (' + coupons.length + '개)\n\n';
-                coupons.forEach(c => { msg += '• ' + c.title + '\n  ' + c.amount.toLocaleString() + '원\n\n'; });
-                tg.showAlert(msg);
+            try {
+                const response = await fetch('/api/coupons/' + tg.initDataUnsafe.user.id);
+                const coupons = await response.json();
+                if (coupons.length === 0) {
+                    tg.showAlert('보유한 쿠폰이 없습니다.');
+                } else {
+                    let msg = '🎟️ 보유 쿠폰 (' + coupons.length + '개)\n\n';
+                    coupons.forEach(c => { 
+                        msg += '• ' + c.title + '\n  ' + c.amount.toLocaleString() + '원\n\n'; 
+                    });
+                    tg.showAlert(msg);
+                }
+            } catch (error) {
+                console.error('쿠폰 조회 실패:', error);
+                tg.showAlert('쿠폰 정보를 불러올 수 없습니다.');
             }
         }
-        
         function handleEvent(e) {
             e.preventDefault();
             window.location.href = '/events';
         }
-        
         function openTelegramProfile(e) {
             e.preventDefault();
-            if (!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user || !tg.initDataUnsafe.user.username) {
-                tg.showAlert('텔레그램 사용자명이 없습니다.');
+            if (!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user) {
+                tg.showAlert('사용자 정보를 가져올 수 없습니다.');
                 return;
             }
-            tg.openTelegramLink('https://t.me/' + tg.initDataUnsafe.user.username);
+            const user = tg.initDataUnsafe.user;
+            if (user.username) {
+                tg.openTelegramLink('https://t.me/' + user.username);
+            } else {
+                tg.showAlert('텔레그램 사용자명이 설정되지 않았습니다.');
+            }
         }
     </script>
 </body>

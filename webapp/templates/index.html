@@ -11,23 +11,79 @@
     />
     <link rel="stylesheet" href="/static/css/style.css" />
     <script>
-        // 페이지 로드 시 모든 내부 링크에 URL 파라미터 자동 추가
+        // 페이지 로드 즉시 URL 파라미터를 프로필 링크에 추가 (즉시 실행)
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const paramsString = urlParams.toString();
+            
+            console.log('현재 URL 파라미터:', paramsString);
+            
+            if (paramsString) {
+                // 하단 네비게이션 프로필 링크
+                const navProfileLink = document.getElementById('navProfileLink');
+                if (navProfileLink) {
+                    navProfileLink.href = '/profile?' + paramsString;
+                    console.log('프로필 링크 업데이트:', navProfileLink.href);
+                }
+                
+                // 페이지 내 모든 /profile 링크 업데이트
+                const allProfileLinks = document.querySelectorAll('a[href="/profile"]');
+                allProfileLinks.forEach(link => {
+                    link.href = '/profile?' + paramsString;
+                    console.log('프로필 링크 발견 및 업데이트:', link.href);
+                });
+            } else {
+                console.warn('⚠️ URL 파라미터가 없습니다!');
+            }
+        })();
+        
+        // 모든 내부 링크에 URL 파라미터 자동 추가
         document.addEventListener('DOMContentLoaded', function() {
             const urlParams = new URLSearchParams(window.location.search);
+            const paramsString = urlParams.toString();
             
-            if (urlParams.toString()) {
-                // 모든 내부 링크 찾기
-                const internalLinks = document.querySelectorAll('a[href^="/"]');
-                
-                internalLinks.forEach(link => {
+            if (paramsString) {
+                // 모든 상대 경로 링크 찾기
+                document.querySelectorAll('a[href^="/"]').forEach(link => {
                     const href = link.getAttribute('href');
                     if (href && !href.includes('?')) {
-                        link.setAttribute('href', href + '?' + urlParams.toString());
-                        console.log('링크 업데이트:', href, '→', href + '?' + urlParams.toString());
+                        link.href = href + '?' + paramsString;
+                        console.log('링크 업데이트:', href, '→', link.href);
                     }
                 });
             }
         });
+        
+        // 동적으로 생성된 링크를 위한 MutationObserver
+        const observer = new MutationObserver(function(mutations) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const paramsString = urlParams.toString();
+            
+            if (paramsString) {
+                mutations.forEach(function(mutation) {
+                    mutation.addedNodes.forEach(function(node) {
+                        if (node.nodeType === 1) { // Element 노드
+                            const links = node.querySelectorAll ? node.querySelectorAll('a[href^="/"]') : [];
+                            links.forEach(link => {
+                                const href = link.getAttribute('href');
+                                if (href && !href.includes('?')) {
+                                    link.href = href + '?' + paramsString;
+                                }
+                            });
+                        }
+                    });
+                });
+            }
+        });
+        
+        // DOM이 준비되면 observer 시작
+        if (document.body) {
+            observer.observe(document.body, { childList: true, subtree: true });
+        } else {
+            document.addEventListener('DOMContentLoaded', function() {
+                observer.observe(document.body, { childList: true, subtree: true });
+            });
+        }
     </script>
 </head>
 <body>
@@ -66,7 +122,7 @@
             <span class="nav-icon">🏠</span>
             <span>홈</span>
         </a>
-        <a href="/profile" class="nav-item" id="profileNavLink">
+        <a href="/profile" class="nav-item" id="navProfileLink">
             <span class="nav-icon">👤</span>
             <span>프로필</span>
         </a>
@@ -85,6 +141,33 @@
 <!-- Swiper JS (CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.js"></script>
 <script src="/static/js/main.js"></script>
+<script>
+    // 페이지 로드 즉시 URL 파라미터를 프로필 링크에 추가 (즉시 실행)
+    (function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const paramsString = urlParams.toString();
+        
+        console.log('현재 URL 파라미터:', paramsString);
+        
+        if (paramsString) {
+            // 하단 네비게이션 프로필 링크
+            const navProfileLink = document.getElementById('navProfileLink');
+            if (navProfileLink) {
+                navProfileLink.href = '/profile?' + paramsString;
+                console.log('프로필 링크 업데이트:', navProfileLink.href);
+            }
+            
+            // 페이지 내 모든 /profile 링크 업데이트
+            const allProfileLinks = document.querySelectorAll('a[href="/profile"]');
+            allProfileLinks.forEach(link => {
+                link.href = '/profile?' + paramsString;
+                console.log('프로필 링크 발견 및 업데이트:', link.href);
+            });
+        } else {
+            console.warn('⚠️ URL 파라미터가 없습니다!');
+        }
+    })();
+</script>
 </body>
 </html>
 

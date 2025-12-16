@@ -236,10 +236,11 @@ function setupNav() {
     
     // URL 파라미터를 프로필 링크에 유지
     const urlParams = new URLSearchParams(window.location.search);
-    const profileNavLink = document.getElementById('profileNavLink');
+    const profileNavLink = document.getElementById('navProfileLink');
     if (profileNavLink && urlParams.toString()) {
         const profileUrl = '/profile?' + urlParams.toString();
         profileNavLink.setAttribute('href', profileUrl);
+        console.log('[main.js] 프로필 링크 업데이트:', profileUrl);
     }
 }
 

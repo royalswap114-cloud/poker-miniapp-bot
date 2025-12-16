@@ -3,32 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>프로필 - TTPOKER</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <title>프로필 - 포커커뮤니티</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body {
-            background: #0f1117;
-            color: white;
+        * {
             margin: 0;
             padding: 0;
-            padding-bottom: 80px; /* 하단 네비게이션 공간 */
+            box-sizing: border-box;
         }
-        
+        body {
+            background: #0f1014;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding-bottom: 80px;
+        }
         .profile-container {
             padding: 20px;
             max-width: 600px;
             margin: 0 auto;
         }
-        
         .profile-header {
             text-align: center;
             padding: 30px 20px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 20px;
             margin-bottom: 20px;
-            color: white;
         }
-        
         .profile-avatar {
             width: 80px;
             height: 80px;
@@ -40,25 +40,21 @@
             justify-content: center;
             font-size: 40px;
         }
-        
         .profile-name {
             font-size: 24px;
             font-weight: bold;
             margin-bottom: 5px;
         }
-        
         .profile-id {
             font-size: 14px;
             opacity: 0.9;
         }
-        
         .menu-section {
             background: #1e2139;
             border-radius: 16px;
             overflow: hidden;
             margin-bottom: 20px;
         }
-        
         .menu-item {
             display: flex;
             align-items: center;
@@ -69,15 +65,12 @@
             text-decoration: none;
             color: white;
         }
-        
         .menu-item:last-child {
             border-bottom: none;
         }
-        
-        .menu-item:hover {
+        .menu-item:active {
             background: rgba(255,255,255,0.05);
         }
-        
         .menu-icon {
             width: 40px;
             height: 40px;
@@ -89,27 +82,22 @@
             margin-right: 15px;
             font-size: 20px;
         }
-        
         .menu-content {
             flex: 1;
         }
-        
         .menu-title {
             font-size: 16px;
             font-weight: 600;
             margin-bottom: 3px;
         }
-        
         .menu-desc {
             font-size: 13px;
             color: #8b92b0;
         }
-        
         .menu-arrow {
             color: #8b92b0;
             font-size: 18px;
         }
-        
         .bottom-nav {
             position: fixed;
             bottom: 0;
@@ -121,7 +109,6 @@
             padding: 10px 0;
             z-index: 100;
         }
-        
         .nav-item {
             flex: 1;
             text-align: center;
@@ -129,15 +116,10 @@
             color: #8b92b0;
             text-decoration: none;
             font-size: 12px;
-            background: none;
-            border: none;
-            cursor: pointer;
         }
-        
         .nav-item.active {
             color: #667eea;
         }
-        
         .nav-icon {
             font-size: 24px;
             display: block;
@@ -147,45 +129,39 @@
 </head>
 <body>
     <div class="profile-container">
-        <!-- 프로필 헤더 -->
         <div class="profile-header">
             <div class="profile-avatar">👤</div>
             <div class="profile-name" id="userName">사용자</div>
-            <div class="profile-id" id="userId">ID: -</div>
+            <div class="profile-id" id="userId">로딩 중...</div>
         </div>
-        
-        <!-- 메뉴 섹션 -->
         <div class="menu-section">
-            <a href="#" class="menu-item" onclick="handleCoupon(event)">
+            <div class="menu-item" onclick="window.location.href='/coupons'">
                 <div class="menu-icon">🎟️</div>
                 <div class="menu-content">
                     <div class="menu-title">쿠폰함</div>
                     <div class="menu-desc">보유 쿠폰 확인</div>
                 </div>
                 <div class="menu-arrow">›</div>
-            </a>
-            
-            <a href="#" class="menu-item" onclick="handleEvent(event)">
+            </div>
+            <div class="menu-item" onclick="window.location.href='/events'">
                 <div class="menu-icon">🎉</div>
                 <div class="menu-content">
                     <div class="menu-title">이벤트</div>
                     <div class="menu-desc">진행중인 이벤트 확인</div>
                 </div>
                 <div class="menu-arrow">›</div>
-            </a>
-            
-            <a href="#" class="menu-item" onclick="openTelegramProfile(event)">
+            </div>
+            <div class="menu-item" onclick="openTelegramProfile()">
                 <div class="menu-icon">📱</div>
                 <div class="menu-content">
                     <div class="menu-title">텔레그램 프로필</div>
                     <div class="menu-desc">텔레그램 계정 정보</div>
                 </div>
                 <div class="menu-arrow">›</div>
-            </a>
+            </div>
         </div>
     </div>
     
-    <!-- 하단 네비게이션 -->
     <div class="bottom-nav">
         <a href="/" class="nav-item">
             <span class="nav-icon">🏠</span>
@@ -197,79 +173,76 @@
         </a>
     </div>
     
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-        let tg;
-        let retryCount = 0;
-        const maxRetries = 10;
+        console.log('=== 프로필 페이지 로드 시작 ===');
         
-        try {
-            tg = window.Telegram.WebApp;
-            tg.ready();
-            tg.expand();
-        } catch (e) {
-            console.error('Telegram WebApp 초기화 실패:', e);
-        }
+        // Telegram WebApp 초기화
+        let tg = window.Telegram?.WebApp;
         
-        function updateUserInfo() {
-            const userNameEl = document.getElementById('userName');
-            const userIdEl = document.getElementById('userId');
+        if (!tg) {
+            console.error('❌ Telegram WebApp 객체를 찾을 수 없습니다');
+            document.getElementById('userId').textContent = 'Telegram WebApp 없음';
+        } else {
+            console.log('✅ Telegram WebApp 객체 발견');
             
-            if (!userNameEl || !userIdEl) {
-                console.error('userName 또는 userId 요소를 찾을 수 없습니다');
-                return;
+            try {
+                tg.ready();
+                tg.expand();
+                console.log('✅ WebApp ready & expand 완료');
+            } catch (e) {
+                console.error('❌ WebApp 초기화 실패:', e);
             }
             
-            console.log('updateUserInfo 시도:', retryCount + 1);
-            console.log('tg:', tg);
-            console.log('initDataUnsafe:', tg ? tg.initDataUnsafe : null);
+            // 사용자 정보 즉시 확인
+            console.log('tg.initData:', tg.initData);
+            console.log('tg.initDataUnsafe:', tg.initDataUnsafe);
             
-            if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                const user = tg.initDataUnsafe.user;
-                const firstName = user.first_name || '';
-                const lastName = user.last_name || '';
-                const fullName = (firstName + ' ' + lastName).trim() || '사용자';
+            let retryCount = 0;
+            const maxRetries = 20;
+            
+            function updateUserInfo() {
+                retryCount++;
+                console.log(`사용자 정보 로드 시도 ${retryCount}/${maxRetries}`);
                 
-                userNameEl.textContent = fullName;
-                userIdEl.textContent = 'ID: ' + user.id;
+                const userNameEl = document.getElementById('userName');
+                const userIdEl = document.getElementById('userId');
                 
-                console.log('✅ 사용자 정보 로드 성공:', user);
-            } else {
-                if (retryCount < maxRetries) {
-                    retryCount++;
-                    userIdEl.textContent = 'ID 로딩 중... (' + retryCount + '/' + maxRetries + ')';
-                    setTimeout(updateUserInfo, 1000); // 1초마다 재시도
+                if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                    const user = tg.initDataUnsafe.user;
+                    console.log('✅ 사용자 정보 발견:', user);
+                    
+                    const firstName = user.first_name || '';
+                    const lastName = user.last_name || '';
+                    const fullName = (firstName + ' ' + lastName).trim() || '사용자';
+                    
+                    userNameEl.textContent = fullName;
+                    userIdEl.textContent = 'ID: ' + user.id;
+                    
+                    console.log('✅ 사용자 정보 표시 완료');
                 } else {
-                    userNameEl.textContent = '사용자';
-                    userIdEl.textContent = 'ID: - (WebApp 환경이 아닙니다)';
-                    console.error('❌ 사용자 정보 로드 실패');
+                    console.log('⏳ 사용자 정보 아직 없음, 재시도...');
+                    
+                    if (retryCount < maxRetries) {
+                        userIdEl.textContent = `로딩 중... (${retryCount}/${maxRetries})`;
+                        setTimeout(updateUserInfo, 500);
+                    } else {
+                        console.error('❌ 사용자 정보 로드 최종 실패');
+                        userNameEl.textContent = '사용자';
+                        userIdEl.textContent = 'WebApp 환경이 아닙니다';
+                    }
                 }
             }
-        }
-        
-        // 즉시 실행
-        updateUserInfo();
-        
-        // DOM 로드 후에도 실행
-        if (document.readyState === 'loading') {
+            
+            // 즉시 실행
+            updateUserInfo();
+            
+            // 다양한 이벤트에서도 재시도
+            window.addEventListener('load', updateUserInfo);
+            window.addEventListener('focus', updateUserInfo);
             document.addEventListener('DOMContentLoaded', updateUserInfo);
         }
         
-        // 페이지 전환 후에도 실행
-        window.addEventListener('focus', updateUserInfo);
-        
-        async function handleCoupon(e) {
-            e.preventDefault();
-            window.location.href = '/coupons';
-        }
-        
-        function handleEvent(e) {
-            e.preventDefault();
-            window.location.href = '/events';
-        }
-        
-        function openTelegramProfile(e) {
-            e.preventDefault();
+        function openTelegramProfile() {
             if (!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user) {
                 alert('텔레그램 사용자 정보를 가져올 수 없습니다.');
                 return;
@@ -284,4 +257,3 @@
     </script>
 </body>
 </html>
-

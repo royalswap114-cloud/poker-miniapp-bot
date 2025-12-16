@@ -359,8 +359,10 @@ def main() -> None:
         build_banner_create_conversation,
         build_update_players_conversation,
         build_coupon_conversation,
+        build_use_coupon_conversation,
         build_event_conversation,
         admin_delete_room_confirm,
+        admin_list_coupons_callback,
     )
 
     application.add_handler(CommandHandler("admin", admin_menu))
@@ -370,10 +372,14 @@ def main() -> None:
     application.add_handler(build_banner_create_conversation())
     application.add_handler(build_update_players_conversation())
     application.add_handler(build_coupon_conversation())
+    application.add_handler(build_use_coupon_conversation())
     application.add_handler(build_event_conversation())
     
     # 관리자 콜백 핸들러 (admin_ 패턴)
     application.add_handler(CallbackQueryHandler(admin_callback_handler, pattern="^admin_"))
+    
+    # 쿠폰 목록 조회 콜백 핸들러
+    application.add_handler(CallbackQueryHandler(admin_list_coupons_callback, pattern="^admin_list_coupons$"))
     
     # 방 삭제 콜백 핸들러 (delete_room_ 패턴)
     application.add_handler(CallbackQueryHandler(admin_delete_room_confirm, pattern="^delete_room_"))
@@ -390,7 +396,7 @@ def main() -> None:
     print("등록된 핸들러:")
     print("  - 기본 명령어: /start, /help, /stats, /debug_token")
     print("  - 관리자 명령어: /admin")
-    print("  - ConversationHandlers: 방 생성, 배너 생성, 인원 수 업데이트, 쿠폰 발급, 이벤트 작성")
+    print("  - ConversationHandlers: 방 생성, 배너 생성, 인원 수 업데이트, 쿠폰 발급, 쿠폰 사용 처리, 이벤트 작성")
     print("  - 콜백 핸들러: admin_*, delete_room_*")
     print("=" * 50)
     

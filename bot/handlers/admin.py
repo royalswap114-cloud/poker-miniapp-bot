@@ -59,6 +59,9 @@ ROOM_PLAYERS_INPUT = 11
     COUPON_EXPIRES,
 ) = range(200, 205)
 
+# 쿠폰 사용 처리 플로우 상태
+USE_COUPON_CODE = 250
+
 # 이벤트 관리 플로우 상태
 (
     EVENT_TITLE,
@@ -719,6 +722,14 @@ async def admin_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
         # ConversationHandler가 처리
         return
 
+    if data == "admin_list_coupons":
+        # 별도 콜백 핸들러에서 처리 (poker_miniapp_bot.py)
+        return
+
+    if data == "admin_use_coupon":
+        # ConversationHandler가 처리
+        return
+
     # ===== 이벤트 관리 =====
     if data == "admin_events":
         await admin_events(update, context)
@@ -1144,6 +1155,7 @@ async def admin_coupons(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     keyboard = [
         [InlineKeyboardButton("➕ 쿠폰 발급", callback_data="admin_create_coupon")],
         [InlineKeyboardButton("📋 쿠폰 목록", callback_data="admin_list_coupons")],
+        [InlineKeyboardButton("✅ 쿠폰 사용 처리", callback_data="admin_use_coupon")],
         [InlineKeyboardButton("« 뒤로", callback_data="admin_menu")]
     ]
     
@@ -1337,6 +1349,155 @@ def build_coupon_conversation() -> ConversationHandler:
             MessageHandler(filters.COMMAND, coupon_cancel),
         ],
     )
+
+
+async def admin_use_coupon_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """쿠폰 사용 처리 시작"""
+    query = update.callback_query
+    if not query:
+        return ConversationHandler.END
+    
+    await query.answer()
+    
+    await query.edit_message_text(
+        "✅ *쿠폰 사용 처리*\n\n"
+        "사용할 쿠폰 코드를 입력하세요:\n"
+        "(예: DIE93K2Y83)\n\n"
+        "취소: /cancel",
+        parse_mode="Markdown"
+    )
+    
+    return USE_COUPON_CODE
+
+
+async def use_coupon_code_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """쿠폰 코드 입력 및 사용 처리"""
+    coupon_code = update.message.text.strip().upper()
+    
+    db = SessionLocal()
+    
+    try:
+        # 쿠폰 조회
+        coupon = db.query(Coupon).filter(Coupon.coupon_code == coupon_code).first()
+        
+        if not coupon:
+            await update.message.reply_text(
+                f"❌ *쿠폰을 찾을 수 없습니다*\n\n"
+                f"입력한 코드: `{coupon_code}`\n\n"
+                "올바른 쿠폰 코드를 확인해주세요.",
+                parse_mode="Markdown"
+            )
+            return ConversationHandler.END
+        
+        # 이미 사용된 쿠폰인지 확인
+        if coupon.is_used:
+            used_date = coupon.used_at.strftime('%Y-%m-%d %H:%M') if coupon.used_at else '알 수 없음'
+            
+            await update.message.reply_text(
+                f"⚠️ *이미 사용된 쿠폰입니다*\n\n"
+                f"📝 제목: {coupon.title}\n"
+                f"💰 금액: {coupon.discount_amount:,}원\n"
+                f"👤 사용자 ID: {coupon.user_id}\n"
+                f"📅 사용 일시: {used_date}",
+                parse_mode="Markdown"
+            )
+            return ConversationHandler.END
+        
+        # 쿠폰 만료 확인
+        if coupon.expires_at and coupon.expires_at < datetime.utcnow():
+            expire_date = coupon.expires_at.strftime('%Y-%m-%d')
+            
+            await update.message.reply_text(
+                f"⏰ *만료된 쿠폰입니다*\n\n"
+                f"📝 제목: {coupon.title}\n"
+                f"💰 금액: {coupon.discount_amount:,}원\n"
+                f"📅 만료일: {expire_date}",
+                parse_mode="Markdown"
+            )
+            return ConversationHandler.END
+        
+        # 쿠폰 사용 처리
+        coupon.is_used = True
+        coupon.used_at = datetime.utcnow()
+        db.commit()
+        
+        await update.message.reply_text(
+            f"✅ *쿠폰 사용 처리 완료!*\n\n"
+            f"📝 제목: {coupon.title}\n"
+            f"💰 금액: {coupon.discount_amount:,}원\n"
+            f"👤 사용자 ID: {coupon.user_id}\n"
+            f"🎟️ 쿠폰 코드: `{coupon_code}`",
+            parse_mode="Markdown"
+        )
+        
+        logger.info(f"[ADMIN] 쿠폰 사용 처리: {coupon_code} (user_id: {coupon.user_id})")
+        
+    finally:
+        db.close()
+    
+    return ConversationHandler.END
+
+
+async def use_coupon_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """쿠폰 사용 처리 취소"""
+    await update.message.reply_text("쿠폰 사용 처리가 취소되었습니다.")
+    return ConversationHandler.END
+
+
+def build_use_coupon_conversation() -> ConversationHandler:
+    """쿠폰 사용 처리용 ConversationHandler 인스턴스 생성."""
+    return ConversationHandler(
+        entry_points=[
+            CallbackQueryHandler(admin_use_coupon_start, pattern="^admin_use_coupon$")
+        ],
+        states={
+            USE_COUPON_CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, use_coupon_code_input)]
+        },
+        fallbacks=[
+            CommandHandler("cancel", use_coupon_cancel),
+            MessageHandler(filters.COMMAND, use_coupon_cancel),
+        ],
+    )
+
+
+async def admin_list_coupons_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """쿠폰 목록 조회"""
+    query = update.callback_query
+    if not query:
+        return
+    
+    await query.answer()
+    
+    db = SessionLocal()
+    
+    try:
+        # 최근 10개 쿠폰 조회
+        coupons = db.query(Coupon).order_by(Coupon.created_at.desc()).limit(10).all()
+        
+        if not coupons:
+            await query.edit_message_text("등록된 쿠폰이 없습니다.")
+            return
+        
+        message = "📋 *최근 쿠폰 목록*\n\n"
+        
+        for coupon in coupons:
+            status = "✅ 사용" if coupon.is_used else "⏳ 미사용"
+            message += f"{status} `{coupon.coupon_code}`\n"
+            message += f"  └ {coupon.title} ({coupon.discount_amount:,}원)\n"
+            message += f"  └ User: {coupon.user_id}\n\n"
+        
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        
+        keyboard = [[InlineKeyboardButton("« 뒤로", callback_data="admin_coupons")]]
+        
+        await query.edit_message_text(
+            message,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown"
+        )
+        
+    finally:
+        db.close()
 
 
 # ==============================

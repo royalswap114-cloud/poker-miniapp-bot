@@ -4,6 +4,25 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>이벤트 - TTPOKER</title>
+    <script>
+        // 페이지 로드 시 모든 내부 링크에 URL 파라미터 자동 추가
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            if (urlParams.toString()) {
+                // 모든 내부 링크 찾기
+                const internalLinks = document.querySelectorAll('a[href^="/"]');
+                
+                internalLinks.forEach(link => {
+                    const href = link.getAttribute('href');
+                    if (href && !href.includes('?')) {
+                        link.setAttribute('href', href + '?' + urlParams.toString());
+                        console.log('링크 업데이트:', href, '→', href + '?' + urlParams.toString());
+                    }
+                });
+            }
+        });
+    </script>
     <style>
         * {
             margin: 0;

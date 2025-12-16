@@ -10,6 +10,25 @@
       href="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.css"
     />
     <link rel="stylesheet" href="/static/css/style.css" />
+    <script>
+        // 페이지 로드 시 모든 내부 링크에 URL 파라미터 자동 추가
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            if (urlParams.toString()) {
+                // 모든 내부 링크 찾기
+                const internalLinks = document.querySelectorAll('a[href^="/"]');
+                
+                internalLinks.forEach(link => {
+                    const href = link.getAttribute('href');
+                    if (href && !href.includes('?')) {
+                        link.setAttribute('href', href + '?' + urlParams.toString());
+                        console.log('링크 업데이트:', href, '→', href + '?' + urlParams.toString());
+                    }
+                });
+            }
+        });
+    </script>
 </head>
 <body>
 <div id="app">

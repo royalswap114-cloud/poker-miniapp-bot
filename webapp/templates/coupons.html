@@ -205,12 +205,17 @@
             const urlParams = new URLSearchParams(window.location.search);
             let userId = urlParams.get('user_id');
             
+            console.log('[COUPONS] URL 파라미터:', urlParams.toString());
+            console.log('[COUPONS] user_id:', userId);
+            
             // URL 파라미터에 없으면 Telegram WebApp에서 시도
             if (!userId && tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
                 userId = tg.initDataUnsafe.user.id;
+                console.log('[COUPONS] Telegram에서 user_id 가져옴:', userId);
             }
             
             if (!userId) {
+                console.error('[COUPONS] user_id를 찾을 수 없습니다');
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-icon">❌</div>
@@ -221,16 +226,28 @@
             }
             
             try {
+                console.log('[COUPONS] API 요청 시작:', '/api/coupons/' + userId);
                 const response = await fetch('/api/coupons/' + userId);
+                console.log('[COUPONS] API 응답 상태:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('[COUPONS] API 응답 실패:', response.status, errorText);
+                    throw new Error('API 응답 실패: ' + response.status + ' - ' + errorText);
+                }
+                
                 allCoupons = await response.json();
+                console.log('[COUPONS] 쿠폰 데이터:', allCoupons);
+                console.log('[COUPONS] 쿠폰 개수:', allCoupons.length);
                 
                 displayCoupons();
             } catch (error) {
-                console.error('쿠폰 로딩 실패:', error);
+                console.error('[COUPONS] 쿠폰 로딩 실패:', error);
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-icon">⚠️</div>
                         <p>쿠폰 정보를 불러올 수 없습니다.</p>
+                        <p style="font-size: 12px; margin-top: 10px; color: #ff6b6b;">${error.message}</p>
                     </div>
                 `;
             }
@@ -239,14 +256,19 @@
         function displayCoupons() {
             const container = document.getElementById('couponsContainer');
             
+            console.log('[COUPONS] displayCoupons 시작, 전체 쿠폰:', allCoupons.length, '필터:', currentFilter);
+            
             let coupons = allCoupons;
             if (currentFilter === 'unused') {
                 coupons = allCoupons.filter(c => !c.is_used);
+                console.log('[COUPONS] 미사용 쿠폰 필터링:', coupons.length);
             } else if (currentFilter === 'used') {
                 coupons = allCoupons.filter(c => c.is_used);
+                console.log('[COUPONS] 사용된 쿠폰 필터링:', coupons.length);
             }
             
             if (coupons.length === 0) {
+                console.log('[COUPONS] 표시할 쿠폰이 없음');
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-icon">🎟️</div>
@@ -255,6 +277,8 @@
                 `;
                 return;
             }
+            
+            console.log('[COUPONS] 쿠폰 렌더링 시작:', coupons.length, '개');
             
             container.innerHTML = coupons.map(coupon => {
                 const expireText = coupon.expires_at 

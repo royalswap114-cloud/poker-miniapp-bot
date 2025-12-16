@@ -152,6 +152,46 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     logger.info("명령어 실행: /start, 사용자: %s", user.id if user else None)
     print(f"[CMD] /start from {user.id if user else None}")
 
+    # 사용자 정보를 DB에 저장/업데이트
+    from bot.database import SessionLocal, User
+    from datetime import datetime
+    
+    db = SessionLocal()
+    try:
+        db_user = db.query(User).filter(User.user_id == user.id).first()
+        if not db_user:
+            db_user = User(
+                user_id=user.id,
+                username=user.username,
+                first_name=user.first_name,
+                created_at=datetime.utcnow()
+            )
+            db.add(db_user)
+            logger.info(f"새 사용자 등록: {user.id} (@{user.username})")
+            print(f"[DB] 새 사용자 등록: {user.id} (@{user.username})")
+        else:
+            # 기존 사용자 정보 업데이트
+            db_user.username = user.username
+            db_user.first_name = user.first_name
+            logger.info(f"사용자 정보 업데이트: {user.id}")
+            print(f"[DB] 사용자 정보 업데이트: {user.id}")
+        
+        db.commit()
+    except Exception as e:
+        logger.error(f"사용자 정보 저장 실패: {e}", exc_info=True)
+        print(f"[ERROR] 사용자 정보 저장 실패: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+    # WebApp URL 검증 및 로깅
+    print(f"[WEBAPP] URL: {WEBAPP_URL}")
+    logger.info(f"WebApp URL: {WEBAPP_URL}")
+    
+    if not WEBAPP_URL.startswith(('http://', 'https://')):
+        logger.warning(f"WebApp URL이 올바른 형식이 아닙니다: {WEBAPP_URL}")
+        print(f"[WARN] WebApp URL이 올바른 형식이 아닙니다: {WEBAPP_URL}")
+
     # WebApp 버튼 (커스텀 미니앱 UI 열기 - WEBAPP_URL)
     webapp_button = InlineKeyboardButton(
         text="🃏 홀덤테이블",

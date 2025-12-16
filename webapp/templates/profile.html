@@ -5,25 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>프로필 - 포커커뮤니티</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script>
-        // 페이지 로드 시 모든 내부 링크에 URL 파라미터 자동 추가
-        document.addEventListener('DOMContentLoaded', function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            
-            if (urlParams.toString()) {
-                // 모든 내부 링크 찾기
-                const internalLinks = document.querySelectorAll('a[href^="/"]');
-                
-                internalLinks.forEach(link => {
-                    const href = link.getAttribute('href');
-                    if (href && !href.includes('?')) {
-                        link.setAttribute('href', href + '?' + urlParams.toString());
-                        console.log('링크 업데이트:', href, '→', href + '?' + urlParams.toString());
-                    }
-                });
-            }
-        });
-    </script>
+    <!-- URL 파라미터 유지 스크립트 -->
+    <script src="/static/js/url-params.js"></script>
     <style>
         * {
             margin: 0;
@@ -154,7 +137,7 @@
             <div class="profile-id" id="userId">로딩 중...</div>
         </div>
         <div class="menu-section">
-            <div class="menu-item" onclick="window.location.href='/coupons'">
+            <div class="menu-item" onclick="navigateTo('/coupons')">
                 <div class="menu-icon">🎟️</div>
                 <div class="menu-content">
                     <div class="menu-title">쿠폰함</div>
@@ -162,7 +145,7 @@
                 </div>
                 <div class="menu-arrow">›</div>
             </div>
-            <div class="menu-item" onclick="window.location.href='/events'">
+            <div class="menu-item" onclick="navigateTo('/events')">
                 <div class="menu-icon">🎉</div>
                 <div class="menu-content">
                     <div class="menu-title">이벤트</div>
@@ -193,6 +176,20 @@
     </div>
     
     <script>
+        // navigateTo 함수 추가
+        function navigateTo(path) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const paramsString = urlParams.toString();
+            
+            console.log('[NAVIGATE] 이동:', path, '파라미터:', paramsString);
+            
+            if (paramsString) {
+                window.location.href = path + '?' + paramsString;
+            } else {
+                window.location.href = path;
+            }
+        }
+        
         console.log('=== 프로필 페이지 로드 시작 ===');
         
         // URL 파라미터에서 사용자 정보 가져오기

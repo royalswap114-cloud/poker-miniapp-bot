@@ -192,10 +192,24 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         logger.warning(f"WebApp URL이 올바른 형식이 아닙니다: {WEBAPP_URL}")
         print(f"[WARN] WebApp URL이 올바른 형식이 아닙니다: {WEBAPP_URL}")
 
-    # WebApp 버튼 (커스텀 미니앱 UI 열기 - WEBAPP_URL)
+    # URL에 사용자 정보 포함 (URL 인코딩)
+    from urllib.parse import urlencode
+    
+    user_params = {
+        'user_id': user.id,
+        'first_name': user.first_name or '',
+        'last_name': user.last_name or '',
+        'username': user.username or ''
+    }
+    
+    webapp_url_with_params = f"{WEBAPP_URL}?{urlencode(user_params)}"
+    logger.info(f"WebApp URL with params: {webapp_url_with_params}")
+    print(f"[WEBAPP] URL with params: {webapp_url_with_params}")
+
+    # WebApp 버튼 (커스텀 미니앱 UI 열기 - 사용자 정보 포함된 URL)
     webapp_button = InlineKeyboardButton(
         text="🃏 홀덤테이블",
-        web_app=WebAppInfo(url=WEBAPP_URL),  # 텔레그램 내 WebView 로 커스텀 미니앱 열기
+        web_app=WebAppInfo(url=webapp_url_with_params),  # 텔레그램 내 WebView 로 커스텀 미니앱 열기
     )
 
     # 제휴업체목록 버튼 (callback query)

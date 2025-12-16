@@ -155,11 +155,11 @@
     </div>
     
     <div class="bottom-nav">
-        <a href="/" class="nav-item">
+        <a href="/" class="nav-item" id="homeNavLink">
             <span class="nav-icon">🏠</span>
             <span>홈</span>
         </a>
-        <a href="/profile" class="nav-item active">
+        <a href="/profile" class="nav-item active" id="profileNavLink">
             <span class="nav-icon">👤</span>
             <span>프로필</span>
         </a>
@@ -182,7 +182,16 @@
         async function loadCoupons() {
             const container = document.getElementById('couponsContainer');
             
-            if (!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user) {
+            // URL 파라미터에서 user_id 가져오기
+            const urlParams = new URLSearchParams(window.location.search);
+            let userId = urlParams.get('user_id');
+            
+            // URL 파라미터에 없으면 Telegram WebApp에서 시도
+            if (!userId && tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                userId = tg.initDataUnsafe.user.id;
+            }
+            
+            if (!userId) {
                 container.innerHTML = `
                     <div class="empty-state">
                         <div class="empty-icon">❌</div>
@@ -191,8 +200,6 @@
                 `;
                 return;
             }
-            
-            const userId = tg.initDataUnsafe.user.id;
             
             try {
                 const response = await fetch('/api/coupons/' + userId);
@@ -259,10 +266,26 @@
             displayCoupons();
         }
         
-        // 페이지 로드 시 쿠폰 로딩
+        // URL 파라미터를 네비게이션 링크에 유지
+        function updateNavLinks() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.toString()) {
+                const params = '?' + urlParams.toString();
+                const homeLink = document.getElementById('homeNavLink');
+                const profileLink = document.getElementById('profileNavLink');
+                if (homeLink) homeLink.href = '/' + params;
+                if (profileLink) profileLink.href = '/profile' + params;
+            }
+        }
+        
+        // 페이지 로드 시 쿠폰 로딩 및 네비게이션 링크 업데이트
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', loadCoupons);
+            document.addEventListener('DOMContentLoaded', () => {
+                updateNavLinks();
+                loadCoupons();
+            });
         } else {
+            updateNavLinks();
             loadCoupons();
         }
     </script>

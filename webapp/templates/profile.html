@@ -163,11 +163,11 @@
     </div>
     
     <div class="bottom-nav">
-        <a href="/" class="nav-item">
+        <a href="/" class="nav-item" id="homeNavLink">
             <span class="nav-icon">🏠</span>
             <span>홈</span>
         </a>
-        <a href="/profile" class="nav-item active">
+        <a href="/profile" class="nav-item active" id="profileNavLink">
             <span class="nav-icon">👤</span>
             <span>프로필</span>
         </a>
@@ -176,15 +176,24 @@
     <script>
         console.log('=== 프로필 페이지 로드 시작 ===');
         
+        // URL 파라미터에서 사용자 정보 가져오기
+        const urlParams = new URLSearchParams(window.location.search);
+        const userIdFromUrl = urlParams.get('user_id');
+        const firstNameFromUrl = urlParams.get('first_name');
+        const lastNameFromUrl = urlParams.get('last_name');
+        const usernameFromUrl = urlParams.get('username');
+        
+        console.log('URL 파라미터:', {
+            user_id: userIdFromUrl,
+            first_name: firstNameFromUrl,
+            last_name: lastNameFromUrl,
+            username: usernameFromUrl
+        });
+        
         // Telegram WebApp 초기화
         let tg = window.Telegram?.WebApp;
         
-        if (!tg) {
-            console.error('❌ Telegram WebApp 객체를 찾을 수 없습니다');
-            document.getElementById('userId').textContent = 'Telegram WebApp 없음';
-        } else {
-            console.log('✅ Telegram WebApp 객체 발견');
-            
+        if (tg) {
             try {
                 tg.ready();
                 tg.expand();
@@ -192,67 +201,89 @@
             } catch (e) {
                 console.error('❌ WebApp 초기화 실패:', e);
             }
+        }
+        
+        // 사용자 정보 표시
+        const userNameEl = document.getElementById('userName');
+        const userIdEl = document.getElementById('userId');
+        
+        if (userIdFromUrl) {
+            // URL 파라미터에서 가져온 정보 사용
+            console.log('✅ URL 파라미터에서 사용자 정보 사용');
             
-            // 사용자 정보 즉시 확인
-            console.log('tg.initData:', tg.initData);
-            console.log('tg.initDataUnsafe:', tg.initDataUnsafe);
+            const firstName = decodeURIComponent(firstNameFromUrl || '');
+            const lastName = decodeURIComponent(lastNameFromUrl || '');
+            const fullName = (firstName + ' ' + lastName).trim() || '사용자';
             
-            let retryCount = 0;
-            const maxRetries = 20;
+            userNameEl.textContent = fullName;
+            userIdEl.textContent = 'ID: ' + userIdFromUrl;
             
-            function updateUserInfo() {
-                retryCount++;
-                console.log(`사용자 정보 로드 시도 ${retryCount}/${maxRetries}`);
-                
-                const userNameEl = document.getElementById('userName');
-                const userIdEl = document.getElementById('userId');
-                
-                if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                    const user = tg.initDataUnsafe.user;
-                    console.log('✅ 사용자 정보 발견:', user);
-                    
-                    const firstName = user.first_name || '';
-                    const lastName = user.last_name || '';
-                    const fullName = (firstName + ' ' + lastName).trim() || '사용자';
-                    
-                    userNameEl.textContent = fullName;
-                    userIdEl.textContent = 'ID: ' + user.id;
-                    
-                    console.log('✅ 사용자 정보 표시 완료');
-                } else {
-                    console.log('⏳ 사용자 정보 아직 없음, 재시도...');
-                    
-                    if (retryCount < maxRetries) {
-                        userIdEl.textContent = `로딩 중... (${retryCount}/${maxRetries})`;
-                        setTimeout(updateUserInfo, 500);
-                    } else {
-                        console.error('❌ 사용자 정보 로드 최종 실패');
-                        userNameEl.textContent = '사용자';
-                        userIdEl.textContent = 'WebApp 환경이 아닙니다';
-                    }
-                }
+            // 전역 변수로 저장 (다른 함수에서 사용)
+            window.currentUserId = userIdFromUrl;
+            window.currentUserName = fullName;
+            window.currentUsername = usernameFromUrl;
+            
+            // URL 파라미터를 네비게이션 링크에 유지
+            updateNavLinks();
+            
+        } else if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            // Telegram WebApp에서 가져온 정보 사용
+            console.log('✅ Telegram WebApp에서 사용자 정보 사용');
+            
+            const user = tg.initDataUnsafe.user;
+            const firstName = user.first_name || '';
+            const lastName = user.last_name || '';
+            const fullName = (firstName + ' ' + lastName).trim() || '사용자';
+            
+            userNameEl.textContent = fullName;
+            userIdEl.textContent = 'ID: ' + user.id;
+            
+            window.currentUserId = user.id;
+            window.currentUserName = fullName;
+            window.currentUsername = user.username;
+            
+            // URL 파라미터를 네비게이션 링크에 유지
+            updateNavLinks();
+            
+        } else {
+            console.error('❌ 사용자 정보를 가져올 수 없습니다');
+            userNameEl.textContent = '사용자';
+            userIdEl.textContent = 'WebApp 환경이 아닙니다';
+        }
+        
+        // URL 파라미터를 네비게이션 링크에 유지
+        function updateNavLinks() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.toString()) {
+                const params = '?' + urlParams.toString();
+                const homeLink = document.getElementById('homeNavLink');
+                const profileLink = document.getElementById('profileNavLink');
+                if (homeLink) homeLink.href = '/' + params;
+                if (profileLink) profileLink.href = '/profile' + params;
             }
-            
-            // 즉시 실행
-            updateUserInfo();
-            
-            // 다양한 이벤트에서도 재시도
-            window.addEventListener('load', updateUserInfo);
-            window.addEventListener('focus', updateUserInfo);
-            document.addEventListener('DOMContentLoaded', updateUserInfo);
         }
         
         function openTelegramProfile() {
-            if (!tg || !tg.initDataUnsafe || !tg.initDataUnsafe.user) {
-                alert('텔레그램 사용자 정보를 가져올 수 없습니다.');
-                return;
-            }
-            const user = tg.initDataUnsafe.user;
-            if (user.username) {
-                tg.openTelegramLink('https://t.me/' + user.username);
+            const username = window.currentUsername || usernameFromUrl;
+            
+            if (username && username !== 'None' && username !== '') {
+                if (tg) {
+                    tg.openTelegramLink('https://t.me/' + username);
+                } else {
+                    window.open('https://t.me/' + username, '_blank');
+                }
+            } else if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.username) {
+                tg.openTelegramLink('https://t.me/' + tg.initDataUnsafe.user.username);
             } else {
                 alert('텔레그램 사용자명이 설정되지 않았습니다.');
             }
+        }
+        
+        // 페이지 로드 시 네비게이션 링크 업데이트
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', updateNavLinks);
+        } else {
+            updateNavLinks();
         }
     </script>
 </body>

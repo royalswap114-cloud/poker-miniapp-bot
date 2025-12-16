@@ -233,6 +233,14 @@ function setupNav() {
             item.classList.remove('active');
         }
     });
+    
+    // URL 파라미터를 프로필 링크에 유지
+    const urlParams = new URLSearchParams(window.location.search);
+    const profileNavLink = document.getElementById('profileNavLink');
+    if (profileNavLink && urlParams.toString()) {
+        const profileUrl = '/profile?' + urlParams.toString();
+        profileNavLink.setAttribute('href', profileUrl);
+    }
 }
 
 function startAutoRefresh() {

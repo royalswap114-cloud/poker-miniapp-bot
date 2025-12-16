@@ -123,11 +123,11 @@
     </div>
     
     <div class="bottom-nav">
-        <a href="/" class="nav-item">
+        <a href="/" class="nav-item" id="homeNavLink">
             <span class="nav-icon">🏠</span>
             <span>홈</span>
         </a>
-        <a href="/profile" class="nav-item active">
+        <a href="/profile" class="nav-item active" id="profileNavLink">
             <span class="nav-icon">👤</span>
             <span>프로필</span>
         </a>
@@ -179,9 +179,25 @@
             }
         }
         
+        // URL 파라미터를 네비게이션 링크에 유지
+        function updateNavLinks() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.toString()) {
+                const params = '?' + urlParams.toString();
+                const homeLink = document.getElementById('homeNavLink');
+                const profileLink = document.getElementById('profileNavLink');
+                if (homeLink) homeLink.href = '/' + params;
+                if (profileLink) profileLink.href = '/profile' + params;
+            }
+        }
+        
         if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', loadEvents);
+            document.addEventListener('DOMContentLoaded', () => {
+                updateNavLinks();
+                loadEvents();
+            });
         } else {
+            updateNavLinks();
             loadEvents();
         }
     </script>

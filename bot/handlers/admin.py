@@ -387,15 +387,19 @@ async def banner_add_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     context.user_data["banner_data"] = {}
 
     text = (
-        "🎨 새 배너 추가\n\n"
-        "Step 1/5: 배너 이미지 URL을 입력해 주세요.\n"
-        "예: https://example.com/banner1.jpg\n\n"
-        "취소하려면 /cancel 을 입력하세요."
+        "🎨 <b>새 배너 만들기</b>\n\n"
+        "📸 <b>권장 사이즈:</b>\n"
+        "• 1200 x 400px (3:1 비율)\n"
+        "• 파일 크기: 500KB 이하\n"
+        "• GIF: 2MB 이하\n\n"
+        "배너 이미지 URL을 입력하세요:\n"
+        "(JPG, PNG, GIF 지원)\n\n"
+        "취소: /cancel"
     )
     if query:
-        await query.message.reply_text(text, reply_markup=ReplyKeyboardRemove())
+        await query.message.reply_text(text, reply_markup=ReplyKeyboardRemove(), parse_mode="HTML")
     else:
-        await update.message.reply_text(text, reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text(text, reply_markup=ReplyKeyboardRemove(), parse_mode="HTML")
 
     return BANNER_IMAGE_URL
 
@@ -1857,22 +1861,26 @@ async def admin_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def admin_list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """이벤트 목록 조회"""
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    
     query = update.callback_query
     if not query:
         return
     
     await query.answer()
     
-    logger.info("[ADMIN] 이벤트 목록 조회 시작")
-    print(f"[ADMIN] 이벤트 목록 조회: user_id={query.from_user.id if query.from_user else None}")
+    logger.info("[ADMIN] 이벤트 목록 버튼 클릭됨")
+    print(f"[ADMIN] 이벤트 목록 버튼 클릭: user_id={query.from_user.id if query.from_user else None}")
     
     db = SessionLocal()
     
     try:
-        events = db.query(Event).order_by(Event.created_at.desc()).limit(10).all()
+        events = db.query(Event).order_by(Event.created_at.desc()).all()
+        
+        logger.info(f"[ADMIN] 이벤트 {len(events)}개 조회됨")
+        print(f"[ADMIN] 이벤트 {len(events)}개 조회됨")
         
         if not events:
-            from telegram import InlineKeyboardMarkup, InlineKeyboardButton
             await query.edit_message_text(
                 "등록된 이벤트가 없습니다.",
                 reply_markup=InlineKeyboardMarkup([
@@ -1881,13 +1889,11 @@ async def admin_list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             )
             return
         
-        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-        
         keyboard = []
         for event in events:
             status_emoji = "✅" if event.status == "active" else "❌"
-            # 제목 길이 제한
-            title = event.title[:30] + "..." if len(event.title) > 30 else event.title
+            # 제목 길이 제한 (텔레그램 버튼 길이 제한)
+            title = event.title[:25] + "..." if len(event.title) > 25 else event.title
             keyboard.append([InlineKeyboardButton(
                 f"{status_emoji} {title}",
                 callback_data=f"event_detail_{event.id}"
@@ -1896,25 +1902,38 @@ async def admin_list_events(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         keyboard.append([InlineKeyboardButton("« 뒤로", callback_data="admin_events")])
         
         await query.edit_message_text(
-            "📋 <b>이벤트 목록</b>\n\n"
-            "이벤트를 선택하여 수정/삭제하세요:",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="HTML"
+            "📋 이벤트 목록\n\n이벤트를 선택하세요:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
         
+    except Exception as e:
+        logger.error(f"[ERROR] 이벤트 목록 오류: {e}", exc_info=True)
+        print(f"[ERROR] 이벤트 목록 오류: {e}")
+        try:
+            await query.edit_message_text(f"오류 발생: {str(e)}")
+        except:
+            await query.message.reply_text(f"오류 발생: {str(e)}")
     finally:
         db.close()
 
 
 async def admin_event_detail(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """이벤트 상세 및 수정/삭제"""
+    """이벤트 상세 보기"""
+    from bot.database import SessionLocal, Event
+    from html import escape
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    
     query = update.callback_query
     if not query:
         return
     
     await query.answer()
     
-    event_id = int(query.data.split("_")[-1])
+    try:
+        event_id = int(query.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await query.edit_message_text("잘못된 이벤트 ID입니다.")
+        return
     
     db = SessionLocal()
     
@@ -1922,49 +1941,87 @@ async def admin_event_detail(update: Update, context: ContextTypes.DEFAULT_TYPE)
         event = db.query(Event).filter(Event.id == event_id).first()
         
         if not event:
-            await query.edit_message_text("이벤트를 찾을 수 없습니다.")
+            await query.edit_message_text(
+                "이벤트를 찾을 수 없습니다.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("« 목록", callback_data="admin_list_events")]
+                ])
+            )
             return
         
-        # HTML 이스케이프 (특수문자 처리)
-        from html import escape
         title = escape(event.title)
-        content = escape(event.content)
-        
-        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        content = escape(event.content)[:200]
         
         keyboard = [
-            [InlineKeyboardButton("🗑 삭제", callback_data=f"event_delete_{event_id}")],
+            [InlineKeyboardButton("🗑 삭제", callback_data=f"event_delete_confirm_{event_id}")],
             [InlineKeyboardButton("🔄 상태 변경", callback_data=f"event_toggle_{event_id}")],
             [InlineKeyboardButton("« 목록", callback_data="admin_list_events")]
         ]
         
         status_text = "활성" if event.status == "active" else "비활성"
-        image_text = "있음" if event.image_url else "없음"
         
         await query.edit_message_text(
-            f"📋 <b>이벤트 상세</b>\n\n"
-            f"<b>제목:</b> {title}\n\n"
-            f"<b>내용:</b>\n{content}\n\n"
-            f"<b>이미지:</b> {image_text}\n"
-            f"<b>상태:</b> {status_text}\n"
-            f"<b>작성일:</b> {event.created_at.strftime('%Y-%m-%d')}\n",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="HTML"
+            f"📋 이벤트 상세\n\n"
+            f"제목: {title}\n\n"
+            f"내용: {content}...\n\n"
+            f"상태: {status_text}",
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
         
+    except Exception as e:
+        logger.error(f"[ERROR] 이벤트 상세 오류: {e}", exc_info=True)
+        print(f"[ERROR] 이벤트 상세 오류: {e}")
+        try:
+            await query.edit_message_text(f"오류 발생: {str(e)}")
+        except:
+            await query.message.reply_text(f"오류 발생: {str(e)}")
     finally:
         db.close()
 
 
-async def admin_event_delete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """이벤트 삭제"""
+async def admin_event_delete_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """이벤트 삭제 확인"""
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    
     query = update.callback_query
     if not query:
         return
     
     await query.answer()
     
-    event_id = int(query.data.split("_")[-1])
+    try:
+        event_id = int(query.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await query.edit_message_text("잘못된 이벤트 ID입니다.")
+        return
+    
+    keyboard = [
+        [InlineKeyboardButton("✅ 삭제 확인", callback_data=f"event_delete_exec_{event_id}")],
+        [InlineKeyboardButton("❌ 취소", callback_data=f"event_detail_{event_id}")]
+    ]
+    
+    await query.edit_message_text(
+        "⚠️ 이벤트 삭제\n\n정말 삭제하시겠습니까?",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def admin_event_delete_exec(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """이벤트 삭제 실행"""
+    from bot.database import SessionLocal, Event
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    
+    query = update.callback_query
+    if not query:
+        return
+    
+    await query.answer()
+    
+    try:
+        event_id = int(query.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await query.edit_message_text("잘못된 이벤트 ID입니다.")
+        return
     
     db = SessionLocal()
     
@@ -1972,32 +2029,50 @@ async def admin_event_delete(update: Update, context: ContextTypes.DEFAULT_TYPE)
         event = db.query(Event).filter(Event.id == event_id).first()
         
         if event:
-            from html import escape
-            title = escape(event.title)
+            title = event.title
             db.delete(event)
             db.commit()
             
             await query.edit_message_text(
-                f"✅ <b>이벤트 삭제 완료</b>\n\n"
-                f"제목: {title}",
-                parse_mode="HTML"
+                f"✅ 이벤트 삭제 완료\n\n제목: {title}",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("« 목록", callback_data="admin_list_events")]
+                ])
             )
             
-            logger.info(f"[ADMIN] Deleted event: {event_id}")
+            logger.info(f"[ADMIN] 이벤트 삭제: {event_id}")
+            print(f"[ADMIN] 이벤트 삭제: {event_id}")
+        else:
+            await query.edit_message_text("이벤트를 찾을 수 없습니다.")
         
+    except Exception as e:
+        logger.error(f"[ERROR] 이벤트 삭제 오류: {e}", exc_info=True)
+        print(f"[ERROR] 이벤트 삭제 오류: {e}")
+        db.rollback()
+        try:
+            await query.edit_message_text(f"오류 발생: {str(e)}")
+        except:
+            await query.message.reply_text(f"오류 발생: {str(e)}")
     finally:
         db.close()
 
 
 async def admin_event_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """이벤트 상태 변경"""
+    from bot.database import SessionLocal, Event
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+    
     query = update.callback_query
     if not query:
         return
     
     await query.answer()
     
-    event_id = int(query.data.split("_")[-1])
+    try:
+        event_id = int(query.data.split("_")[-1])
+    except (ValueError, IndexError):
+        await query.edit_message_text("잘못된 이벤트 ID입니다.")
+        return
     
     db = SessionLocal()
     
@@ -2008,19 +2083,31 @@ async def admin_event_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE)
             event.status = "inactive" if event.status == "active" else "active"
             db.commit()
             
-            from html import escape
             status_text = "활성" if event.status == "active" else "비활성"
-            title = escape(event.title)
             
             await query.edit_message_text(
-                f"✅ <b>상태 변경 완료</b>\n\n"
-                f"제목: {title}\n"
+                f"✅ 상태 변경 완료\n\n"
+                f"제목: {event.title}\n"
                 f"새 상태: {status_text}",
-                parse_mode="HTML"
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("« 상세", callback_data=f"event_detail_{event_id}")],
+                    [InlineKeyboardButton("« 목록", callback_data="admin_list_events")]
+                ])
             )
             
-            logger.info(f"[ADMIN] Toggle event status: {event_id} → {event.status}")
+            logger.info(f"[ADMIN] 이벤트 상태 변경: {event_id} → {event.status}")
+            print(f"[ADMIN] 이벤트 상태 변경: {event_id} → {event.status}")
+        else:
+            await query.edit_message_text("이벤트를 찾을 수 없습니다.")
         
+    except Exception as e:
+        logger.error(f"[ERROR] 이벤트 상태 변경 오류: {e}", exc_info=True)
+        print(f"[ERROR] 이벤트 상태 변경 오류: {e}")
+        db.rollback()
+        try:
+            await query.edit_message_text(f"오류 발생: {str(e)}")
+        except:
+            await query.message.reply_text(f"오류 발생: {str(e)}")
     finally:
         db.close()
 

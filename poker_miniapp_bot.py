@@ -366,7 +366,8 @@ def main() -> None:
         admin_list_coupons_callback,
         admin_list_events,
         admin_event_detail,
-        admin_event_delete,
+        admin_event_delete_confirm,
+        admin_event_delete_exec,
         admin_event_toggle,
     )
 
@@ -381,17 +382,18 @@ def main() -> None:
     application.add_handler(build_use_coupon_conversation())
     application.add_handler(build_event_conversation())
     
-    # 관리자 콜백 핸들러 (admin_ 패턴)
-    application.add_handler(CallbackQueryHandler(admin_callback_handler, pattern="^admin_"))
+    # 이벤트 관련 콜백 핸들러 (구체적인 패턴을 먼저 등록)
+    application.add_handler(CallbackQueryHandler(admin_list_events, pattern="^admin_list_events$"))
+    application.add_handler(CallbackQueryHandler(admin_event_detail, pattern="^event_detail_"))
+    application.add_handler(CallbackQueryHandler(admin_event_delete_confirm, pattern="^event_delete_confirm_"))
+    application.add_handler(CallbackQueryHandler(admin_event_delete_exec, pattern="^event_delete_exec_"))
+    application.add_handler(CallbackQueryHandler(admin_event_toggle, pattern="^event_toggle_"))
     
     # 쿠폰 목록 조회 콜백 핸들러
     application.add_handler(CallbackQueryHandler(admin_list_coupons_callback, pattern="^admin_list_coupons$"))
     
-    # 이벤트 관련 콜백 핸들러
-    application.add_handler(CallbackQueryHandler(admin_list_events, pattern="^admin_list_events$"))
-    application.add_handler(CallbackQueryHandler(admin_event_detail, pattern="^event_detail_"))
-    application.add_handler(CallbackQueryHandler(admin_event_delete, pattern="^event_delete_"))
-    application.add_handler(CallbackQueryHandler(admin_event_toggle, pattern="^event_toggle_"))
+    # 관리자 콜백 핸들러 (admin_ 패턴 - 구체적인 패턴 이후에 등록)
+    application.add_handler(CallbackQueryHandler(admin_callback_handler, pattern="^admin_"))
     
     # 방 삭제 콜백 핸들러 (delete_room_ 패턴)
     application.add_handler(CallbackQueryHandler(admin_delete_room_confirm, pattern="^delete_room_"))

@@ -283,8 +283,14 @@ async function displayBanners(banners) {
 
             console.log(`[배너] 로딩 시도: ID=${b.id}, URL=${imageUrl}`);
 
+            // 링크가 있으면 <a> 태그로 감싸고, 없으면 <div>로 감싸기
+            const linkWrapper = b.link_url 
+                ? `<a class="banner-image-link" href="${linkUrl}" target="_blank" rel="noopener noreferrer">`
+                : `<div class="banner-image-link">`;
+            const linkWrapperClose = b.link_url ? `</a>` : `</div>`;
+            
             slide.innerHTML = `
-                <a class="banner-image-link" href="${linkUrl}" target="_blank" rel="noopener noreferrer">
+                ${linkWrapper}
                     <img 
                         src="${imageUrl}" 
                         alt="${bannerTitle}" 
@@ -300,9 +306,8 @@ async function displayBanners(banners) {
                     <div class="banner-overlay">
                         ${b.title ? `<div class="banner-title">${b.title}</div>` : ""}
                         ${b.description ? `<div class="banner-desc">${b.description}</div>` : ""}
-                        ${b.link_url ? `<div class="banner-link-text">${b.link_url}</div>` : ""}
                     </div>
-                </a>
+                ${linkWrapperClose}
             `;
             container.appendChild(slide);
         }

@@ -19,23 +19,31 @@ body {
     background: radial-gradient(circle at top, #1b2040 0, #050712 60%);
     color: var(--text-primary);
     min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;  /* 가로 스크롤 방지 */
 }
 
 #app {
     max-width: 480px;
     margin: 0 auto;
     padding-bottom: 70px; /* bottom nav 공간 */
+    position: relative;
 }
 
-/* 배너 캐러셀 */
+/* 배너 캐러셀 - viewport 전체 너비 사용 */
 .banner-carousel {
-    width: calc(100% + 40px);  /* 양옆 padding 20px씩 제거 (room-list padding 12px + 여유) */
-    margin-left: -20px;
-    margin-right: -20px;
-    margin-bottom: 20px;
+    width: 100vw;  /* viewport 전체 너비 */
     position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;  /* 중앙 정렬 */
+    margin-right: -50vw;
+    margin-bottom: 20px;
+    margin-top: 0;
+    padding: 0;
     overflow: hidden;
-    border-radius: 0;
+    background: #1a1d2e;
 }
 
 .banner-swiper {
@@ -43,6 +51,7 @@ body {
     overflow: hidden;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
     height: 320px; /* 요구사항: 높이 300~350px 사이 (모바일 전체 너비) */
+    width: 100%;
 }
 
 .banner-slide {
@@ -143,6 +152,15 @@ body {
     border-radius: 50%;
     background: rgba(0, 0, 0, 0.4);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+    z-index: 10;
+}
+
+.banner-swiper .swiper-button-prev {
+    left: 10px;  /* 화면 끝에서 10px */
+}
+
+.banner-swiper .swiper-button-next {
+    right: 10px;  /* 화면 끝에서 10px */
 }
 
 .banner-swiper .swiper-button-prev:after,
@@ -151,7 +169,10 @@ body {
 }
 
 .banner-swiper .swiper-pagination-bullets {
-    bottom: 6px;
+    bottom: 15px;  /* 하단 여백 증가 */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
 }
 
 .banner-swiper .swiper-pagination-bullet {

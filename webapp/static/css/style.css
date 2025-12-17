@@ -29,11 +29,17 @@ body {
 
 /* 배너 캐러셀 */
 .banner-carousel {
-    padding: 8px 0 4px; /* 좌우 여백 최소화, 전체 너비 느낌 */
+    width: calc(100% + 40px);  /* 양옆 padding 20px씩 제거 (room-list padding 12px + 여유) */
+    margin-left: -20px;
+    margin-right: -20px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 0;
 }
 
 .banner-swiper {
-    border-radius: 16px;
+    border-radius: 0;
     overflow: hidden;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
     height: 320px; /* 요구사항: 높이 300~350px 사이 (모바일 전체 너비) */
@@ -43,6 +49,7 @@ body {
     position: relative;
     width: 100%;
     height: 100%;
+    overflow: hidden;
 }
 
 .banner-image-link {
@@ -65,12 +72,15 @@ body {
 }
 
 .banner-image {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    object-fit: contain;  /* cover → contain으로 변경 (이미지 전체 표시) */
-    background: #0f1014;  /* 배경색 추가 (빈 공간 채움) */
+    object-fit: cover;  /* contain → cover로 변경 (화면 가득 채움) */
+    object-position: center;  /* 중앙 정렬 */
     display: block;
-    border-radius: 16px;
+    border-radius: 0;
     /* GIF, PNG, JPG 모두 지원 (GIF는 자동으로 애니메이션 재생) */
 }
 
